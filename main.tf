@@ -22,10 +22,9 @@ module "lambda-queryVCF" {
 
   environment ={
     variables = {
-      DATASETS_TABLE = "${aws_dynamodb_table.datasets.name}"
+      SVEP_TEMP = "${aws_s3_bucket.svep-temp.bucket}"
       QUERY_GTF_SNS_TOPIC_ARN = "${aws_sns_topic.queryGTF.arn}"
       QUERY_VCF_EXTENDED_SNS_TOPIC_ARN = "${aws_sns_topic.queryVCFExtended.arn}"
-      CONCAT_SNS_TOPIC_ARN = "${aws_sns_topic.concat.arn}"
     }
   }
 }
@@ -50,10 +49,9 @@ module "lambda-queryVCFExtended" {
 
   environment ={
     variables = {
-      DATASETS_TABLE = "${aws_dynamodb_table.datasets.name}"
+      SVEP_TEMP = "${aws_s3_bucket.svep-temp.bucket}"
       QUERY_GTF_SNS_TOPIC_ARN = "${aws_sns_topic.queryGTF.arn}"
       QUERY_VCF_EXTENDED_SNS_TOPIC_ARN = "${aws_sns_topic.queryVCFExtended.arn}"
-      CONCAT_SNS_TOPIC_ARN = "${aws_sns_topic.concat.arn}"
     }
   }
 }
@@ -76,7 +74,7 @@ module "lambda-queryGTF" {
   #tags = "${var.common-tags}"
   environment ={
     variables = {
-      DATASETS_TABLE = "${aws_dynamodb_table.datasets.name}"
+      SVEP_TEMP = "${aws_s3_bucket.svep-temp.bucket}"
       REFERENCE_GENOME = "s3://svep/sorted_filtered_Homo_sapiens.GRCh38.98.chr.gtf.gz"
       PLUGIN_CONSEQUENCE_SNS_TOPIC_ARN = "${aws_sns_topic.pluginConsequence.arn}"
       PLUGIN_UPDOWNSTREAM_SNS_TOPIC_ARN = "${aws_sns_topic.pluginUpdownstream.arn}"
@@ -107,6 +105,7 @@ module "lambda-pluginConsequence" {
   ]
   environment ={
     variables = {
+      SVEP_TEMP = "${aws_s3_bucket.svep-temp.bucket}"
       SVEP_REGIONS = "${aws_s3_bucket.svep-regions.bucket}"
       REFERENCE_LOCATION = "s3://svep/"
     }
@@ -131,6 +130,7 @@ module "lambda-pluginUpdownstream" {
   #tags = "${var.common-tags}"
   environment ={
     variables = {
+      SVEP_TEMP = "${aws_s3_bucket.svep-temp.bucket}"
       REFERENCE_GENOME = "s3://svep/transcripts_Homo_sapiens.GRCh38.98.chr.gtf.gz"
       SVEP_REGIONS = "${aws_s3_bucket.svep-regions.bucket}"
       CONCAT_SNS_TOPIC_ARN = "${aws_sns_topic.concat.arn}"
@@ -158,7 +158,7 @@ module "lambda-concat" {
 
   environment ={
     variables = {
-      DATASETS_TABLE = "${aws_dynamodb_table.datasets.name}"
+      SVEP_TEMP = "${aws_s3_bucket.svep-temp.bucket}"
       SVEP_REGIONS = "${aws_s3_bucket.svep-regions.bucket}"
       SVEP_RESULTS = "${aws_s3_bucket.svep-results.bucket}"
       CONCAT_SNS_TOPIC_ARN = "${aws_sns_topic.concat.arn}"

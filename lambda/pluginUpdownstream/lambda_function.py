@@ -8,12 +8,16 @@ import boto3
 import sys
 import re
 import shlex
-
+#global vars
+sns = boto3.client('sns')
+s3 = boto3.resource('s3')
+#environ variables
+SVEP_TEMP = os.environ['SVEP_TEMP']
 CONCAT_SNS_TOPIC_ARN = os.environ['CONCAT_SNS_TOPIC_ARN']
 REFERENCE_GENOME = os.environ['REFERENCE_GENOME']
 SVEP_REGIONS = os.environ['SVEP_REGIONS']
 os.environ['PATH'] += ':' + os.environ['LAMBDA_TASK_ROOT']
-sns = boto3.client('sns')
+
 
 
 def queryUpdownstream(chrom, pos, alt, transcripts):
@@ -76,6 +80,7 @@ def lambda_handler(event, context):
     snsData = message['snsData']
     APIid = message['APIid']
     batchID = message['batchID']
+    tempFileName = message['tempFileName']
     lastBatchID = message['lastBatchID']
     writeData = []
     for row in snsData:
@@ -102,6 +107,9 @@ def lambda_handler(event, context):
     s3 = boto3.resource('s3')
     s3.Bucket(SVEP_REGIONS).upload_file(filename, APIid+"_"+batchID+"_updownstream.tsv")
     print("uploaded")
+    #After processing all the results delete the placeholder temp file from SVEP_TEMP bucket
+    s3.Object(SVEP_TEMP, tempFileName).delete()
+    print("deleted")
     if(lastBatchID == 1):
         print("sending for concat")
         kwargs = {

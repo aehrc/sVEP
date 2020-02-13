@@ -4,23 +4,21 @@ import os
 import subprocess
 import time
 import boto3
-
 from api_response import bad_request, bundle_response, missing_parameter
 from chrom_matching import CHROMOSOME_LENGTHS_MBP, get_vcf_chromosomes, get_matching_chromosome
+#global vars
 MILLISECONDS_BEFORE_SPLIT = 15000
 SLICE_SIZE_MBP = 100
 RECORDS_PER_SAMPLE = 100
 PAYLOAD_SIZE = 262000
-DATASETS_TABLE_NAME = os.environ['DATASETS_TABLE']
-QUERY_GTF_SNS_TOPIC_ARN = os.environ['QUERY_GTF_SNS_TOPIC_ARN']
-QUERY_VCF_EXTENDED_SNS_TOPIC_ARN = os.environ['QUERY_VCF_EXTENDED_SNS_TOPIC_ARN']
-CONCAT_SNS_TOPIC_ARN = os.environ['CONCAT_SNS_TOPIC_ARN']
-os.environ['PATH'] += ':' + os.environ['LAMBDA_TASK_ROOT']
+s3 = boto3.resource('s3')
 sns = boto3.client('sns')
 dynamodb = boto3.client('dynamodb')
-
-
-
+#environ variables
+SVEP_TEMP = os.environ['SVEP_TEMP']
+QUERY_GTF_SNS_TOPIC_ARN = os.environ['QUERY_GTF_SNS_TOPIC_ARN']
+QUERY_VCF_EXTENDED_SNS_TOPIC_ARN = os.environ['QUERY_VCF_EXTENDED_SNS_TOPIC_ARN']
+os.environ['PATH'] += ':' + os.environ['LAMBDA_TASK_ROOT']
 
 regions = {}
 for chrom, size in CHROMOSOME_LENGTHS_MBP.items():
@@ -30,26 +28,6 @@ for chrom, size in CHROMOSOME_LENGTHS_MBP.items():
         chrom_regions.append(start)
         start += SLICE_SIZE_MBP
     regions[chrom] = chrom_regions
-
-def get_size(obj, seen=None):
-    """Recursively finds size of objects"""
-    size = sys.getsizeof(obj)
-    if seen is None:
-        seen = set()
-    obj_id = id(obj)
-    if obj_id in seen:
-        return 0
-    # Important mark as seen *before* entering recursion to gracefully handle
-    # self-referential objects
-    seen.add(obj_id)
-    if isinstance(obj, dict):
-        size += sum([get_size(v, seen) for v in obj.values()])
-        size += sum([get_size(k, seen) for k in obj.keys()])
-    elif hasattr(obj, '__dict__'):
-        size += get_size(obj.__dict__, seen)
-    elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes, bytearray)):
-        size += sum([get_size(i, seen) for i in obj])
-    return size
 
 def get_translated_regions(location):
     vcf_chromosomes = get_vcf_chromosomes(location)
@@ -70,9 +48,6 @@ def get_regions(location, chrom, start, end):
         location
     ]
     query_process = subprocess.Popen(args, stdout=subprocess.PIPE,stderr=subprocess.PIPE, cwd='/tmp',encoding='ascii')
-    #print(args)
-    #print(query_process.stderr.read())
-    print("get regions time = ",(time.time() - test)*1000)
     return query_process
 
 def get_regions_and_variants(location, chrom, start, end, time_assigned):
@@ -82,29 +57,9 @@ def get_regions_and_variants(location, chrom, start, end, time_assigned):
     all_changes = [l.split('\t')[2]+"\t"+l.split('\t')[3] for l in regions_list]
     return all_coords,all_changes
 
-def putDataset(APIid,batchID):
-    '''item = {
-        'APIid':APIid,
-        'batchID':batchID,
-        'count':0
-        }
-    kwargs = {
-        'TableName': DATASETS_TABLE_NAME,
-        'Item': item,
-    }'''
-    kwargs = {
-        'TableName': DATASETS_TABLE_NAME,
-        'Key': {
-            'APIid': {
-                'S': APIid,
-            },
-        },
-        'UpdateExpression': 'ADD batchID :b, filesCount :c ',
-        'ExpressionAttributeValues': {':b': { 'SS' : [batchID]}, ':c' :{'N':'0'} },
-    }
-    print('Updating item: {}'.format(json.dumps(kwargs)))
-    dynamodb.update_item(**kwargs)
-
+def createTempFile(APIid,batchID):
+    filename = APIid+"_"+batchID
+    s3.Object(SVEP_TEMP, filename).put(Body=(b""))
 
 def submitQueryGTF(total_coords,total_changes, requestID, regionID,lastBatchID):
     kwargs = {
@@ -117,7 +72,7 @@ def submitQueryGTF(total_coords,total_changes, requestID, regionID,lastBatchID):
         if((idx == finalData) and (lastBatchID == 1) ):
             batchID = regionID+"_"+str(idx)
             print(batchID)
-            putDataset(requestID,batchID)
+            createTempFile(requestID,batchID)
             kwargs['Message'] = json.dumps({
                 'coords':total_coords[idx],
                 'changes':total_changes[idx],
@@ -128,7 +83,7 @@ def submitQueryGTF(total_coords,total_changes, requestID, regionID,lastBatchID):
         else:
             batchID = regionID+"_"+str(idx)
             print(batchID)
-            putDataset(requestID,batchID)
+            createTempFile(requestID,batchID)
             kwargs['Message'] = json.dumps({
                 'coords':total_coords[idx],
                 'changes':total_changes[idx],

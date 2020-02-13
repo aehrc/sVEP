@@ -76,7 +76,7 @@ use consequence::TranscriptVariationAllele;
 my $config = {};
 my $fastaLocation =  $ENV{'REFERENCE_LOCATION'};
 my $outputLocation =  $ENV{'SVEP_REGIONS'};
-
+my $tempLocation =  $ENV{'SVEP_TEMP'};
 sub handle {
     my ($payload, $context) = @_;
     #print Dumper $payload;
@@ -92,8 +92,10 @@ sub handle {
     my @data = $message->{'snsData'};
     my $id = $message->{'APIid'};
     my $batchId = $message->{'batchID'};
+    my $tempFileName = $message->{'tempFileName'};
     print("APIid is - $id");
     print("batchID is - $batchId");
+    print("tempFileName is - $tempFileName");
     #############################################
 
     #print Dumper @data;
@@ -122,6 +124,9 @@ sub handle {
 
     my $out = 's3://'.$outputLocation.'/';
     system("/opt/awscli/aws s3 cp $filename $out");
+    print("Done Copying");
+    my $tempOut = 's3://'.$tempLocation.'/'.$tempFileName;
+    system("/opt/awscli/aws s3 rm $tempOut");
     print("Done Copying");
 }
 

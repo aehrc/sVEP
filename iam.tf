@@ -19,15 +19,6 @@ data "aws_iam_policy_document" "main-apigateway" {
 data "aws_iam_policy_document" "lambda-queryVCF" {
   statement {
     actions = [
-      "dynamodb:PutItem",
-      "dynamodb:UpdateItem",
-    ]
-    resources = [
-      "${aws_dynamodb_table.datasets.arn}",
-    ]
-  }
-  statement {
-    actions = [
       "SNS:Publish",
     ]
     resources = [
@@ -40,6 +31,7 @@ data "aws_iam_policy_document" "lambda-queryVCF" {
     actions = [
       "s3:GetObject",
       "s3:ListBucket",
+      "s3:PutObject",
     ]
     resources = ["*"]
   }
@@ -51,15 +43,6 @@ data "aws_iam_policy_document" "lambda-queryVCF" {
 data "aws_iam_policy_document" "lambda-queryVCFExtended" {
   statement {
     actions = [
-      "dynamodb:PutItem",
-      "dynamodb:UpdateItem",
-    ]
-    resources = [
-      "${aws_dynamodb_table.datasets.arn}",
-    ]
-  }
-  statement {
-    actions = [
       "SNS:Publish",
     ]
     resources = [
@@ -72,6 +55,7 @@ data "aws_iam_policy_document" "lambda-queryVCFExtended" {
     actions = [
       "s3:GetObject",
       "s3:ListBucket",
+      "s3:PutObject",
     ]
     resources = ["*"]
   }
@@ -82,15 +66,6 @@ data "aws_iam_policy_document" "lambda-queryVCFExtended" {
 # queryGTF Lambda Function
 #
 data "aws_iam_policy_document" "lambda-queryGTF" {
-  statement {
-      actions = [
-        "dynamodb:UpdateItem",
-        "dynamodb:Query",
-      ]
-      resources = [
-        "${aws_dynamodb_table.datasets.arn}",
-      ]
-  }
   statement {
     actions = [
       "SNS:Publish",
@@ -104,6 +79,8 @@ data "aws_iam_policy_document" "lambda-queryGTF" {
     actions = [
       "s3:GetObject",
       "s3:ListBucket",
+      "s3:PutObject",
+      "s3:DeleteObject",
     ]
     resources = ["*"]
   }
@@ -120,6 +97,7 @@ data "aws_iam_policy_document" "lambda-pluginConsequence" {
       "s3:GetObject",
       "s3:ListBucket",
       "s3:PutObject",
+      "s3:DeleteObject",
     ]
     resources = ["*"]
   }
@@ -136,6 +114,7 @@ data "aws_iam_policy_document" "lambda-pluginUpdownstream" {
       "s3:GetObject",
       "s3:ListBucket",
       "s3:PutObject",
+      "s3:DeleteObject",
     ]
     resources = ["*"]
   }
@@ -154,15 +133,6 @@ data "aws_iam_policy_document" "lambda-pluginUpdownstream" {
 # concat Lambda Function
 #
 data "aws_iam_policy_document" "lambda-concat" {
-  statement {
-    actions = [
-      "dynamodb:GetItem",
-      "dynamodb:Query",
-    ]
-    resources = [
-      "${aws_dynamodb_table.datasets.arn}",
-    ]
-  }
   statement {
     actions = [
       "s3:GetObject",

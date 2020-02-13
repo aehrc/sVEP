@@ -7,15 +7,17 @@ import time
 import boto3
 import sys
 
+#global vars
 PAYLOAD_SIZE = 262000
-DATASETS_TABLE_NAME = os.environ['DATASETS_TABLE']
+sns = boto3.client('sns')
+s3 = boto3.resource('s3')
+#environ variables
+SVEP_TEMP = os.environ['SVEP_TEMP']
 REFERENCE_GENOME = os.environ['REFERENCE_GENOME']
 PLUGIN_CONSEQUENCE_SNS_TOPIC_ARN = os.environ['PLUGIN_CONSEQUENCE_SNS_TOPIC_ARN']
 PLUGIN_UPDOWNSTREAM_SNS_TOPIC_ARN = os.environ['PLUGIN_UPDOWNSTREAM_SNS_TOPIC_ARN']
 os.environ['PATH'] += ':' + os.environ['LAMBDA_TASK_ROOT']
-sns = boto3.client('sns')
-dynamodb = boto3.client('dynamodb')
-s3 = boto3.resource('s3')
+
 
 #testing done
 def overlap_feature(all_coords,all_changes):
@@ -65,31 +67,12 @@ def get_size(obj, seen=None):
         size += sum([get_size(i, seen) for i in obj])
     return size
 
-def updateDataset(APIid,batchID,counter):
-    kwargs = {
-        'TableName': DATASETS_TABLE_NAME,
-        'Key': {
-            'APIid': {
-                'S': APIid,
-            },
-        },
-        'UpdateExpression': 'ADD filesCount :c ',
-        'ExpressionAttributeValues': { ':c' :{'N':str(counter)} },
-    }
-    print('Updating Count of files: {}'.format(json.dumps(kwargs)))
-    dynamodb.update_item(**kwargs)
-    kwargs = {
-        'TableName': DATASETS_TABLE_NAME,
-        'Key': {
-            'APIid': {
-                'S': APIid,
-            },
-        },
-        'UpdateExpression': 'DELETE batchID :b ',
-        'ExpressionAttributeValues': { ':b' :{'SS':[batchID]} },
-    }
-    print('Deleting batch id item: {}'.format(json.dumps(kwargs)))
-    dynamodb.update_item(**kwargs)
+def createTempFile(filename):
+    s3.Object(SVEP_TEMP, filename).put(Body=(b""))
+
+def deleteTempFile(APIid,batchID):
+    filename = APIid+"_"+batchID
+    s3.Object(SVEP_TEMP, filename).delete()
 
 def publish_consequences_plugin(slice_data,APIid,batchID,lastBatchID):
     topics = [PLUGIN_CONSEQUENCE_SNS_TOPIC_ARN,PLUGIN_UPDOWNSTREAM_SNS_TOPIC_ARN]
@@ -109,10 +92,13 @@ def publish_consequences_plugin(slice_data,APIid,batchID,lastBatchID):
             counter += 1
             uniqueBatchID = batchID +"_"+str(counter)
             print(uniqueBatchID)
+            #createTempFile(APIid,uniqueBatchID)
             for topic in topics:
                 #"TopicArn": PLUGIN_CONSEQUENCE_SNS_TOPIC_ARN,
+                tempFileName = APIid+"_"+batchID+"_"+topic
+                createTempFile(tempFileName)
                 kwargs["TopicArn"] = topic
-                kwargs['Message'] = json.dumps({ "snsData" : snsData, "APIid":APIid,"batchID":uniqueBatchID,"lastBatchID":0})
+                kwargs['Message'] = json.dumps({ "snsData" : snsData, "APIid":APIid,"batchID":uniqueBatchID,"tempFileName":tempFileName,"lastBatchID":0})
                 print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
                 response = sns.publish(**kwargs)
                 print('Received Response: {}'.format(json.dumps(response)))
@@ -124,14 +110,18 @@ def publish_consequences_plugin(slice_data,APIid,batchID,lastBatchID):
             counter += 1
             uniqueBatchID = batchID +"_"+str(counter)
             print(uniqueBatchID)
-            files = counter * num
+            #createTempFile(APIid,uniqueBatchID)
+            #files = counter * num
             for topic in topics:
+                tempFileName = APIid+"_"+batchID+"_"+topic
+                createTempFile(tempFileName)
                 kwargs["TopicArn"] = topic
-                kwargs['Message'] = json.dumps({ "snsData" : snsData, "APIid":APIid,"batchID":uniqueBatchID,"lastBatchID":lastBatchID})
+                kwargs['Message'] = json.dumps({ "snsData" : snsData, "APIid":APIid,"batchID":uniqueBatchID,"tempFileName":tempFileName,"lastBatchID":lastBatchID})
                 print('Publishing to SNS: {}'.format(kwargs))
                 response = sns.publish(**kwargs)
                 print('Received Response: {}'.format(json.dumps(response)))
-            updateDataset(APIid,batchID,files)
+            deleteTempFile(APIid,batchID)
+            #updateDataset(APIid,batchID,files)
 
 
 
