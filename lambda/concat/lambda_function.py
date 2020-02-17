@@ -4,38 +4,33 @@ import os
 import subprocess
 import time
 import boto3
-
-CONCAT_SNS_TOPIC_ARN = os.environ['CONCAT_SNS_TOPIC_ARN']
-DATASETS_TABLE_NAME = os.environ['DATASETS_TABLE']
-SVEP_REGIONS = os.environ['SVEP_REGIONS']
-SVEP_RESULTS = os.environ['SVEP_RESULTS']
-os.environ['PATH'] += ':' + os.environ['LAMBDA_TASK_ROOT']
+#global vars
 s3 = boto3.client('s3')
 s3Obj = boto3.resource('s3')
 dynamodb = boto3.client('dynamodb')
 sns = boto3.client('sns')
+#environ variables
+SVEP_TEMP = os.environ['SVEP_TEMP']
+CONCAT_SNS_TOPIC_ARN = os.environ['CONCAT_SNS_TOPIC_ARN']
+SVEP_REGIONS = os.environ['SVEP_REGIONS']
+SVEP_RESULTS = os.environ['SVEP_RESULTS']
+os.environ['PATH'] += ':' + os.environ['LAMBDA_TASK_ROOT']
 
 
-def publishResult(numFiles, APIid, batchID):
-    filename = APIid+"_results.tsv"
-    bucket = s3Obj.Bucket(SVEP_REGIONS)
-    files =[]
-    content = []
-    for key in s3.list_objects(Bucket=SVEP_REGIONS)['Contents']:
-        if(key['Key'].startswith(APIid)):
-            files.append(key['Key'])
-    if(numFiles == len(files)):
+
+def publishResult( APIid, batchID):
+    pre = APIid+"_"+batchID
+    if(len(s3.list_objects_v2(Bucket=SVEP_REGIONS, Prefix=pre)['Contents']) == 2):
+        filename = APIid+"_results.tsv"
+        bucket = s3Obj.Bucket(SVEP_REGIONS)
+        content = []
         for obj in bucket.objects.filter(Prefix=APIid):
             body = obj.get()['Body'].read()
             content.append(body)
-
         s3Obj.Object(SVEP_RESULTS, filename).put(Body=(b"\n".join(content)))
-        #with open("/tmp/merge.tsv", 'w') as tsvfile:
-        #    tsvfile.write("\n".join(content))
-
-        #s3Obj.Bucket(SVEP_RESULTS).upload_file("/tmp/merge.tsv", filename)
+        print(" Done concatenating")
     else:
-        print("resending for concat")
+        print("last BatchID doesnt exist yet- resending to concat")
         kwargs = {
             'TopicArn': CONCAT_SNS_TOPIC_ARN,
         }
@@ -44,20 +39,20 @@ def publishResult(numFiles, APIid, batchID):
         response = sns.publish(**kwargs)
         print('Received Response: {}'.format(json.dumps(response)))
 
-
 def queryDataset(APIid,batchID):
-    kwargs = {
-        'TableName': DATASETS_TABLE_NAME,
-        'Key': {
-            'APIid': {
-                'S': APIid,
-            },
-        },
-    }
-    response = dynamodb.get_item(**kwargs)
-    numFiles = int(response['Item']['filesCount']['N'])
-    publishResult(numFiles, APIid, batchID)
-
+    objs = s3.list_objects(Bucket=SVEP_TEMP)
+    #print(exists(s3.list_objects(Bucket=SVEP_TEMP)['Contents']))
+    if('Contents' in objs):
+        print("resending for concat")
+        kwargs = {
+            'TopicArn': CONCAT_SNS_TOPIC_ARN,
+        }
+        kwargs['Message'] = json.dumps({'APIid' : APIid,'lastBatchID' : batchID})
+        print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
+        response = sns.publish(**kwargs)
+        print('Received Response: {}'.format(json.dumps(response)))
+    else:
+        publishResult(APIid, batchID)
 
 
 def lambda_handler(event, context):

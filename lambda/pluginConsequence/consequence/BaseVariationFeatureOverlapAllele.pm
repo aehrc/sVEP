@@ -278,6 +278,7 @@ sub get_all_OverlapConsequences {
         }
       }
     }
+    
 
     $cons = [$DEFAULT_OVERLAP_CONSEQUENCE] unless @$cons;
     #print($cons);
@@ -387,7 +388,7 @@ sub _pre_consequence_predicates {
     #print Dumper $pred_digest;
 
 
-    if(!exists($feat->{'cds'}) && !exists($feat->{'three_prime_utr'}) && !exists($feat->{'five_prime_utr'})){
+    if(!exists($feat->{'cds'}) && !exists($feat->{'three_prime_utr'}) && !exists($feat->{'five_prime_utr'}) && exists($bvf->{'exon'}) ){
       $self->_update_preds($preds, 'exon', 1, \$pred_digest);
     }
 
@@ -496,6 +497,9 @@ sub _bvfo_preds {
 
       # store biotype
       $self->_update_preds($bvfo_preds, $feat->{biotype}, 1, \$pred_digest);
+      if(exists($bvf->{'intron'}) ){
+        $self->_update_preds($preds, 'intron', 1, \$pred_digest);
+      }
 
       # find any overlapping introns, intron boundary regions and exons
       #$self->_update_preds(

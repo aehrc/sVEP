@@ -50,13 +50,16 @@ def get_regions(location, chrom, start, end):
     query_process = subprocess.Popen(args, stdout=subprocess.PIPE,stderr=subprocess.PIPE, cwd='/tmp',encoding='ascii')
     #print(args)
     #print(query_process.stderr.read())
-    #print("get regions time = ",(time.time() - test)*1000)
+    print("get regions time = ",(time.time() - test)*1000)
     return query_process
 
 def get_regions_and_variants(location, chrom, start, end, time_assigned):
+
     regions_process = get_regions(location,chrom, start, end)
+    test = time.time()
     regions_list = regions_process.stdout.read().splitlines()
     all_coords = [l.split('\t')[0]+"\t"+l.split('\t')[1] for l in regions_list]
+    print("coords split time = ",(time.time() - test)*1000)
     all_changes = [l.split('\t')[2]+"\t"+l.split('\t')[3] for l in regions_list]
     return all_coords,all_changes
 

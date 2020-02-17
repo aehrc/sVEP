@@ -133,7 +133,7 @@ sub handle {
 # parse a line of VCF input into a variation feature object
 sub parse_vcf {
     my $line = shift;
-    print Dumper $line;
+    #print Dumper $line;
     my ($chr, $start, $end, $ref, $alt) = ($line->{'chrom'}, $line->{'pos'}, $line->{'pos'}, $line->{'ref'}, $line->{'alt'});
     print("$chr\t$start\n");
     my @data = @{$line->{'data'}};
@@ -298,6 +298,7 @@ sub parse_vcf {
             chr            => $chr,
             seq_region_start => $info{'exon_start'},
             seq_region_end => $info{'exon_end'},
+            exon         => 1,
         });
 
         if(exists($info{'CDS'})){
@@ -401,6 +402,7 @@ sub parse_vcf {
             map_weight     => 1,
             variation_name => undef ,
             chr            => $chr,
+            intron         => 1,
         });
         $tr = consequence::Transcript->new_fast({
             stable_id          => $info{transcript_id},
@@ -434,10 +436,18 @@ sub parse_vcf {
       my ($cons, $rank) = vf_to_consequences($vf);
 
       if(exists($tr->{'three_prime_utr'})){
+        if( $cons eq 'intergenic_variant'){
+          $cons = '3_prime_UTR_variant'
+        }else{
         $cons = '3_prime_UTR_variant,'.$cons;
+        }
       }
       if(exists($tr->{'five_prime_utr'})){
+        if( $cons eq 'intergenic_variant'){
+          $cons = '5_prime_UTR_variant'
+        }else{
         $cons = '5_prime_UTR_variant,'.$cons;
+        }
       }
 
       my $line = $rank."\t".('.')."\t".$chr.':'.$start.'-'.$end."\t".$alt."\t".$cons."\t".$info{gene_name}."\t".$info{gene_id}."\t".$rows[2]."\t".
@@ -502,14 +512,16 @@ sub vf_to_consequences {
     #print Dumper @ocs;
     #print($vfos->{'transcript'}->{'stable_id'});
     #print("ARE WE HERE\n");
-    #$line->{Consequence} = join ",", keys %{{map {$_ => 1} map {$_->$term_method || $_->SO_term} @ocs}};
-    $line = $ocs[0]->$term_method || $ocs[0]->SO_term;
+    $line->{Consequence} = join ",", keys %{{map {$_ => 1} map {$_->$term_method || $_->SO_term} @ocs}};
+    #$line = $ocs[0]->$term_method || $ocs[0]->SO_term;
+    my $conLine = $line->{Consequence};
     my $rank = $ocs[0]->rank;
     #print Dumper $line;
 
     #push @return, $line;
+    print("$conLine\n");
 
-  return $line, $rank;
+  return $conLine, $rank;
 }
 
 

@@ -658,6 +658,7 @@ our %OVERLAP_CONSEQUENCES = (
   'feature_class' => 'consequence::Transcript',
   'impact' => 'MODIFIER',
   'include' => {
+                 'nonsense_mediated_decay' => 0,
                  'protein_coding' => 0,
                  'within_feature' => 1
                },
@@ -807,6 +808,25 @@ our %OVERLAP_CONSEQUENCES = (
   'predicate' => 'consequence::VariationEffect::feature_ablation',
   'rank' => '26',
   'tier' => '2',
+  'variant_feature_class' => 'consequence::BaseVariationFeature'
+}
+),
+'intron_variant' => consequence::OverlapConsequence->new_fast({
+  'NCBI_term' => 'intron',
+  'SO_accession' => 'SO:0001627',
+  'SO_term' => 'intron_variant',
+  'description' => 'A transcript variant occurring within an intron',
+  'display_term' => 'INTRONIC',
+  'feature_SO_term' => 'primary_transcript',
+  'feature_class' => 'consequence::Transcript',
+  'impact' => 'MODIFIER',
+  'include' => {
+                 'intron' => 1
+               },
+  'label' => 'intron variant',
+  'predicate' => 'consequence::VariationEffect::within_intron',
+  'rank' => '21',
+  'tier' => '3',
   'variant_feature_class' => 'consequence::BaseVariationFeature'
 }
 ),
@@ -988,25 +1008,7 @@ our $SO_ACC_MAPPER = {
   'variant_feature_class' => 'consequence::VariationFeature'
 }
 ),
-'intron_variant' => consequence::OverlapConsequence->new_fast({
-  'NCBI_term' => 'intron',
-  'SO_accession' => 'SO:0001627',
-  'SO_term' => 'intron_variant',
-  'description' => 'A transcript variant occurring within an intron',
-  'display_term' => 'INTRONIC',
-  'feature_SO_term' => 'primary_transcript',
-  'feature_class' => 'consequence::Transcript',
-  'impact' => 'MODIFIER',
-  'include' => {
-                 'intron' => 1
-               },
-  'label' => 'intron variant',
-  'predicate' => 'consequence::VariationEffect::within_intron',
-  'rank' => '21',
-  'tier' => '3',
-  'variant_feature_class' => 'consequence::BaseVariationFeature'
-}
-),
+
 =cut
 
 

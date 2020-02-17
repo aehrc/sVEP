@@ -520,6 +520,7 @@ sub within_intron {
     my ($bvfoa, $feat, $bvfo, $bvf) = @_;
     $bvfo ||= $bvfoa->base_variation_feature_overlap;
 
+    return 1 if exists($bvf->{'intron'});
     return $bvfoa->_intron_effects($feat, $bvfo, $bvf)->{intronic};
 }
 
