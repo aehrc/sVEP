@@ -92,7 +92,7 @@ def lambda_handler(event, context):
         results = []
         for dat in data:
             if(len(dat) == 0):
-                writeData.append(38+"\t"+"."+"\t"+chrom+":"+str(pos)+"-"+str(pos)+"\t"+alt+"\t"+"intergenic_gene_variant")
+                writeData.append(str(38)+"\t"+"."+"\t"+chrom+":"+str(pos)+"-"+str(pos)+"\t"+alt+"\t"+"intergenic_gene_variant"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-")
                 transcripts = []
                 continue
             transcripts.append(re.search('transcript_id\s\\\"(\w+)\\\"\;', dat, re.IGNORECASE).group(1))
