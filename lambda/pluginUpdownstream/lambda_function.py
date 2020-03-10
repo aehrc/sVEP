@@ -10,7 +10,7 @@ import re
 import shlex
 #global vars
 sns = boto3.client('sns')
-s3 = boto3.resource('s3')
+
 #environ variables
 SVEP_TEMP = os.environ['SVEP_TEMP']
 CONCAT_SNS_TOPIC_ARN = os.environ['CONCAT_SNS_TOPIC_ARN']
@@ -27,9 +27,8 @@ def queryUpdownstream(chrom, pos, alt, transcripts):
         loc = str(chrom)+":"+str(up)+"-"+str(down)
         #print(loc)
         #print("position is ", pos)
-        args = [
-            'tabix',
-            REFERENCE_GENOME,loc]
+
+        args = ['tabix','/tmp/transcripts_Homo_sapiens.GRCh38.98.chr.gtf.gz',loc]
         query_process = subprocess.Popen(args, stdout=subprocess.PIPE,stderr=subprocess.PIPE, cwd='/tmp',encoding='ascii')
         mainData = query_process.stdout.read().rstrip('\n').split('\n')
         line=""
@@ -83,6 +82,14 @@ def lambda_handler(event, context):
     tempFileName = message['tempFileName']
     lastBatchID = message['lastBatchID']
     writeData = []
+    s3 = boto3.resource('s3')
+    
+    BUCKET_NAME = 'svep'
+    keys = ['transcripts_Homo_sapiens.GRCh38.98.chr.gtf.gz', 'transcripts_Homo_sapiens.GRCh38.98.chr.gtf.gz.tbi']
+    for KEY in keys:
+        local_file_name = '/tmp/'+KEY
+        s3.Bucket(BUCKET_NAME).download_file(KEY, local_file_name)
+
     for row in snsData:
         chrom = row['chrom']
         pos = row['pos']
@@ -104,7 +111,6 @@ def lambda_handler(event, context):
     print(batchID)
     with open(filename, 'w') as tsvfile:
         tsvfile.write("\n".join(writeData))
-    s3 = boto3.resource('s3')
     s3.Bucket(SVEP_REGIONS).upload_file(filename, APIid+"_"+batchID+"_updownstream.tsv")
     print("uploaded")
     #After processing all the results delete the placeholder temp file from SVEP_TEMP bucket

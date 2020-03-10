@@ -25,6 +25,7 @@ module "lambda-queryVCF" {
       SVEP_TEMP = "${aws_s3_bucket.svep-temp.bucket}"
       QUERY_GTF_SNS_TOPIC_ARN = "${aws_sns_topic.queryGTF.arn}"
       QUERY_VCF_EXTENDED_SNS_TOPIC_ARN = "${aws_sns_topic.queryVCFExtended.arn}"
+      QUERY_VCF_SUBMIT_SNS_TOPIC_ARN = "${aws_sns_topic.queryVCFsubmit.arn}"
     }
   }
 }
@@ -52,6 +53,34 @@ module "lambda-queryVCFExtended" {
       SVEP_TEMP = "${aws_s3_bucket.svep-temp.bucket}"
       QUERY_GTF_SNS_TOPIC_ARN = "${aws_sns_topic.queryGTF.arn}"
       QUERY_VCF_EXTENDED_SNS_TOPIC_ARN = "${aws_sns_topic.queryVCFExtended.arn}"
+      QUERY_VCF_SUBMIT_SNS_TOPIC_ARN = "${aws_sns_topic.queryVCFsubmit.arn}"
+    }
+  }
+}
+
+#
+# queryVCFsubmit Lambda Function
+#
+module "lambda-queryVCFsubmit" {
+  source = "github.com/claranet/terraform-aws-lambda"
+
+  function_name = "queryVCFsubmit"
+  description = "This lambda will be called if there are too many batchids to be processed within"
+  handler = "lambda_function.lambda_handler"
+  runtime = "python3.6"
+  memory_size = 2048
+  timeout = 28
+  policy = {
+    json = data.aws_iam_policy_document.lambda-queryVCFsubmit.json
+  }
+  source_path = "${path.module}/lambda/queryVCFsubmit"
+  #tags = "${var.common-tags}"
+
+  environment ={
+    variables = {
+      SVEP_TEMP = "${aws_s3_bucket.svep-temp.bucket}"
+      QUERY_GTF_SNS_TOPIC_ARN = "${aws_sns_topic.queryGTF.arn}"
+      QUERY_VCF_SUBMIT_SNS_TOPIC_ARN = "${aws_sns_topic.queryVCFsubmit.arn}"
     }
   }
 }
@@ -78,10 +107,11 @@ module "lambda-queryGTF" {
       REFERENCE_GENOME = "s3://svep/sorted_filtered_Homo_sapiens.GRCh38.98.chr.gtf.gz"
       PLUGIN_CONSEQUENCE_SNS_TOPIC_ARN = "${aws_sns_topic.pluginConsequence.arn}"
       PLUGIN_UPDOWNSTREAM_SNS_TOPIC_ARN = "${aws_sns_topic.pluginUpdownstream.arn}"
+      QUERY_GTF_SNS_TOPIC_ARN = "${aws_sns_topic.queryGTF.arn}"
     }
   }
-
 }
+
 
 #
 # pluginConsequence Lambda Function
@@ -162,6 +192,61 @@ module "lambda-concat" {
       SVEP_REGIONS = "${aws_s3_bucket.svep-regions.bucket}"
       SVEP_RESULTS = "${aws_s3_bucket.svep-results.bucket}"
       CONCAT_SNS_TOPIC_ARN = "${aws_sns_topic.concat.arn}"
+      CREATEPAGES_SNS_TOPIC_ARN = "${aws_sns_topic.createPages.arn}"
+    }
+  }
+}
+
+#
+# createPages Lambda Function
+#
+module "lambda-createPages" {
+  source = "github.com/claranet/terraform-aws-lambda"
+
+  function_name = "createPages"
+  description = "concatenates individual page received from concat lambda"
+  handler = "lambda_function.lambda_handler"
+  runtime = "python3.6"
+  memory_size = 2048
+  timeout = 28
+  policy = {
+    json = data.aws_iam_policy_document.lambda-createPages.json
+  }
+  source_path = "${path.module}/lambda/createPages"
+  #tags = "${var.common-tags}"
+
+  environment ={
+    variables = {
+      SVEP_REGIONS = "${aws_s3_bucket.svep-regions.bucket}"
+      CONCATPAGES_SNS_TOPIC_ARN = "${aws_sns_topic.concatPages.arn}"
+
+    }
+  }
+}
+
+#
+# concatPages Lambda Function
+#
+module "lambda-concatPages" {
+  source = "github.com/claranet/terraform-aws-lambda"
+
+  function_name = "concatPages"
+  description = "concatenates all the page files created by createPages lambda."
+  handler = "lambda_function.lambda_handler"
+  runtime = "python3.6"
+  memory_size = 2048
+  timeout = 28
+  policy = {
+    json = data.aws_iam_policy_document.lambda-concatPages.json
+  }
+  source_path = "${path.module}/lambda/concatPages"
+  #tags = "${var.common-tags}"
+
+  environment ={
+    variables = {
+      SVEP_REGIONS = "${aws_s3_bucket.svep-regions.bucket}"
+      SVEP_RESULTS = "${aws_s3_bucket.svep-results.bucket}"
+      CONCATPAGES_SNS_TOPIC_ARN = "${aws_sns_topic.concatPages.arn}"
     }
   }
 }

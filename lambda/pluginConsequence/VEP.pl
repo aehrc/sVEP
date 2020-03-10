@@ -93,9 +93,9 @@ sub handle {
     my $id = $message->{'APIid'};
     my $batchId = $message->{'batchID'};
     my $tempFileName = $message->{'tempFileName'};
-    print("APIid is - $id");
-    print("batchID is - $batchId");
-    print("tempFileName is - $tempFileName");
+    print("APIid is - $id\n");
+    print("batchID is - $batchId\n");
+    print("tempFileName is - $tempFileName\n");
     #############################################
 
     #print Dumper @data;
@@ -135,7 +135,7 @@ sub parse_vcf {
     my $line = shift;
     #print Dumper $line;
     my ($chr, $start, $end, $ref, $alt) = ($line->{'chrom'}, $line->{'pos'}, $line->{'pos'}, $line->{'ref'}, $line->{'alt'});
-    print("$chr\t$start\n");
+    #print("$chr\t$start\n");
     my @data = @{$line->{'data'}};
     if($data[0] eq ""){
       return;
@@ -300,6 +300,7 @@ sub parse_vcf {
             seq_region_end => $info{'exon_end'},
             exon         => 1,
         });
+        my $intron_boundary;
 
         if(exists($info{'CDS'})){
           my $location = $chr.':'.$info{'CDS_start'}.'-'.$info{'CDS_end'};
@@ -311,6 +312,12 @@ sub parse_vcf {
           $seq =~ s/[\r\n]+//g;
           $length = ($info{'CDS_end'}-$info{'CDS_start'},$info{'CDS_start'}-$info{'CDS_end'})[$info{'CDS_end'}-$info{'CDS_start'} < $info{'CDS_start'}-$info{'CDS_end'}];
 
+          if( (($info{'CDS_end'} - $start) < 4) || (($start - $info{'CDS_start'}  ) < 4) ){
+            $intron_boundary =1;
+          }else{
+            $intron_boundary =0;
+          }
+
           $tr = consequence::Transcript->new_fast({
               stable_id          => $info{transcript_id},
               version            => $info{transcript_version},
@@ -321,6 +328,7 @@ sub parse_vcf {
               start => $rows[3],
               end => $rows[4],
               cds => 1,
+              intron_boundary => $intron_boundary,
               cdna_coding_start => $info{'CDS_start'},
               cdna_coding_end => $info{'CDS_end'},
               cds_frame => $info{'CDS_frame'},
@@ -332,6 +340,11 @@ sub parse_vcf {
               alt_allele => $alt,
           });
         }elsif(exists($info{'three_prime_utr'}) ){
+          if( (($info{'exon_end'} - $start) < 3) || (($start - $info{'exon_start'}  ) < 3) ){
+            $intron_boundary =1;
+          }else{
+            $intron_boundary =0;
+          }
           $tr = consequence::Transcript->new_fast({
               stable_id          => $info{transcript_id},
               version            => $info{transcript_version},
@@ -345,6 +358,8 @@ sub parse_vcf {
               exon_start => $info{'exon_start'},
               exon_end => $info{'exon_end'},
               strand => $strand,
+              intron_boundary => $intron_boundary,
+              splice_acceptor_variant => 1,
               #seq => $seq,
               #seq_length => $length,
               position => $start,
@@ -352,6 +367,11 @@ sub parse_vcf {
               alt_allele => $alt,
           });
         }elsif(exists($info{'five_prime_utr'})){
+          if( (($info{'exon_end'} - $start) < 3) || (($start - $info{'exon_start'}  ) < 3) ){
+            $intron_boundary =1;
+          }else{
+            $intron_boundary =0;
+          }
           $tr = consequence::Transcript->new_fast({
               stable_id          => $info{transcript_id},
               version            => $info{transcript_version},
@@ -365,6 +385,8 @@ sub parse_vcf {
               exon_start => $info{'exon_start'},
               exon_end => $info{'exon_end'},
               strand => $strand,
+              splice_donor_variant => 1,
+              intron_boundary => $intron_boundary,
               #seq => $seq,
               #seq_length => $length,
               position => $start,
@@ -372,6 +394,11 @@ sub parse_vcf {
               alt_allele => $alt,
           });
         }else{
+          if( (($info{'exon_end'} - $start) < 4) || (($start - $info{'exon_start'}  ) < 4) ){
+            $intron_boundary =1;
+          }else{
+            $intron_boundary =0;
+          }
           $tr = consequence::Transcript->new_fast({
               stable_id          => $info{transcript_id},
               version            => $info{transcript_version},
@@ -384,6 +411,7 @@ sub parse_vcf {
               strand => $strand,
               exon_start => $info{'exon_start'},
               exon_end => $info{'exon_end'},
+              intron_boundary => $intron_boundary,
               #seq => $seq,
               #seq_length => $length,
               position => $start,
@@ -454,6 +482,9 @@ sub parse_vcf {
       $info{transcript_id}.".".$info{transcript_version}."\t".$info{transcript_biotype}."\t".($info{'exon_number'} || '-')."\t".
       ($tv->{'feature'}{'aa'} || '-')."\t".($tv->{'feature'}{'codons'} || '-')."\t".$strand."\t".($info{transcript_support_level}|| '-');
       #print($result1);
+      if(length $tr->{warning}){
+        $line = $line."\t".$tr->{warning};
+      }
       push @results,$line;
       #print("$rank\n");
 
@@ -519,7 +550,7 @@ sub vf_to_consequences {
     #print Dumper $line;
 
     #push @return, $line;
-    print("$conLine\n");
+    #print("$conLine\n");
 
   return $conLine, $rank;
 }

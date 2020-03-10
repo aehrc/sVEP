@@ -11,41 +11,20 @@ import sys
 PAYLOAD_SIZE = 262000
 sns = boto3.client('sns')
 s3 = boto3.resource('s3')
+MILLISECONDS_BEFORE_SPLIT = 4000
 #environ variables
 SVEP_TEMP = os.environ['SVEP_TEMP']
 REFERENCE_GENOME = os.environ['REFERENCE_GENOME']
 PLUGIN_CONSEQUENCE_SNS_TOPIC_ARN = os.environ['PLUGIN_CONSEQUENCE_SNS_TOPIC_ARN']
 PLUGIN_UPDOWNSTREAM_SNS_TOPIC_ARN = os.environ['PLUGIN_UPDOWNSTREAM_SNS_TOPIC_ARN']
+QUERY_GTF_SNS_TOPIC_ARN = os.environ['QUERY_GTF_SNS_TOPIC_ARN']
 os.environ['PATH'] += ':' + os.environ['LAMBDA_TASK_ROOT']
 
 
-#testing done
-def overlap_feature(all_coords,all_changes):
-    results = []
-    BUCKET_NAME = 'svep'
-    keys = ['sorted_filtered_Homo_sapiens.GRCh38.98.chr.gtf.gz', 'sorted_filtered_Homo_sapiens.GRCh38.98.chr.gtf.gz.tbi']
-    for KEY in keys:
-        local_file_name = '/tmp/'+KEY
-        s3.Bucket(BUCKET_NAME).download_file(KEY, local_file_name)
-
-    for idx, coord in enumerate(all_coords):
-        chr, pos = coord.split('\t')
-        loc = chr+":"+pos+"-"+pos
-        changes = all_changes[idx]
-        data={}
-        args = ['tabix','/tmp/sorted_filtered_Homo_sapiens.GRCh38.98.chr.gtf.gz',loc]
-        query_process = subprocess.Popen(args, stdout=subprocess.PIPE,stderr=subprocess.PIPE, cwd='/tmp',encoding='ascii')
-        mainData = query_process.stdout.read().rstrip('\n').split('\n')
-        data = {
-            'chrom':chr,
-            'pos':pos,
-            'ref':changes.split('\t')[0],
-            'alt':changes.split('\t')[1],
-            'data':mainData
-        }
-        results.append(data)
-
-    return results
+def moveReferenceDataToTMP(BUCKET_NAME,keys):
+        for KEY in keys:
+            local_file_name = '/tmp/'+KEY
+            s3.Bucket(BUCKET_NAME).download_file(KEY, local_file_name)
 
 def get_size(obj, seen=None):
     """Recursively finds size of objects"""
@@ -68,43 +47,98 @@ def get_size(obj, seen=None):
     return size
 
 def createTempFile(filename):
+    print("File created is - ",filename)
     s3.Object(SVEP_TEMP, filename).put(Body=(b""))
 
 def deleteTempFile(APIid,batchID):
     filename = APIid+"_"+batchID
+    print("File deleting - ",filename)
     s3.Object(SVEP_TEMP, filename).delete()
 
-def publish_consequences_plugin(slice_data,APIid,batchID,lastBatchID):
+def sendDatatoPlugins(topic,results,APIid,uniqueBatchID,tempFileName,lastBatchID):
+    kwargs = {}
+    createTempFile(tempFileName)
+    kwargs["TopicArn"] = topic
+    kwargs['Message'] = json.dumps({ "snsData" : results, "APIid":APIid,"batchID":uniqueBatchID,"tempFileName":tempFileName,"lastBatchID":lastBatchID})
+    print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
+    response = sns.publish(**kwargs)
+
+def sendDatatoItself(remainingCoords, APIid, uniqueBatchID, lastBatchID):
+    kwargs = {}
+    print("Less Time remaining - call itself.")
+    kwargs = {'TopicArn': QUERY_GTF_SNS_TOPIC_ARN,}
+    kwargs['Message'] = json.dumps({ "coords" : remainingCoords, "APIid":APIid,"batchID":uniqueBatchID,"lastBatchID":lastBatchID})
+    print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
+    response = sns.publish(**kwargs)
+
+#testing done
+def overlap_feature(all_coords,APIid,batchID,lastBatchID,time_assigned,startTime):
+    results = []
     topics = [PLUGIN_CONSEQUENCE_SNS_TOPIC_ARN,PLUGIN_UPDOWNSTREAM_SNS_TOPIC_ARN]
     num = len(topics)
-    kwargs = {}
-    finalData = len(slice_data) - 1
-    snsData = []
+    finalData = len(all_coords) - 1
     tot_size = 0
     counter = 0
-    for idx, slice_datum in enumerate(slice_data):
-        print(json.dumps(slice_datum))
-        cur_size = get_size(slice_datum)
+    for idx, coord in enumerate(all_coords):
+        test = time.time()
+
+        chr, pos, ref, alt = coord.split('\t')
+        loc = chr+":"+pos+"-"+pos
+        #changes = all_changes[idx]
+        data={}
+        args = ['tabix','/tmp/sorted_filtered_Homo_sapiens.GRCh38.98.chr.gtf.gz',loc]
+        query_process = subprocess.Popen(args, stdout=subprocess.PIPE,stderr=subprocess.PIPE, cwd='/tmp',encoding='ascii')
+        mainData = query_process.stdout.read().rstrip('\n').split('\n')
+        data = {
+            'chrom':chr,
+            'pos':pos,
+            'ref':ref,
+            'alt':alt,
+            'data':mainData
+        }
+        cur_size = get_size(data)
         tot_size += cur_size
         if(tot_size < PAYLOAD_SIZE):
-            snsData.append(slice_datum)
+            results.append(data)
+            if((time.time() - startTime)*1000 > time_assigned):#should only be executed in very very few cases.
+                counter += 1
+                uniqueBatchID = batchID +"_"+str(counter)
+                print(uniqueBatchID)
+                print("records processed ", idx)
+                for topic in topics:
+                    tempFileName = APIid+"_"+uniqueBatchID+"_"+topic
+                    sendDatatoPlugins(topic,results,APIid,uniqueBatchID,tempFileName,0)
+
+                uniqueBatchID = batchID +"_GTF"+str(counter)
+                remainingCoords = all_coords[idx:]
+                sendDatatoItself(remainingCoords, APIid, uniqueBatchID, lastBatchID)
+                tempFileName = APIid+"_"+uniqueBatchID
+                createTempFile(tempFileName)
+                deleteTempFile(APIid,batchID)
+                break
         else:
             counter += 1
             uniqueBatchID = batchID +"_"+str(counter)
             print(uniqueBatchID)
-            #createTempFile(APIid,uniqueBatchID)
+            print("records processed ", idx)
             for topic in topics:
-                #"TopicArn": PLUGIN_CONSEQUENCE_SNS_TOPIC_ARN,
-                tempFileName = APIid+"_"+batchID+"_"+topic
+                tempFileName = APIid+"_"+uniqueBatchID+"_"+topic
+                sendDatatoPlugins(topic,results,APIid,uniqueBatchID,tempFileName,0)
+                #print('Received Response: {}'.format(json.dumps(response)))
+            #print("Time taken to process %d = %d"%(tot_size,(time.time() - test)*1000))
+            #print("Time remaining in lambda = ",context.get_remaining_time_in_millis())
+            if((time.time() - startTime)*1000 > time_assigned):
+                uniqueBatchID = batchID +"_GTF"+str(counter)
+                remainingCoords = all_coords[idx:]
+                sendDatatoItself(remainingCoords, APIid, uniqueBatchID, lastBatchID)
+                tempFileName = APIid+"_"+uniqueBatchID
                 createTempFile(tempFileName)
-                kwargs["TopicArn"] = topic
-                kwargs['Message'] = json.dumps({ "snsData" : snsData, "APIid":APIid,"batchID":uniqueBatchID,"tempFileName":tempFileName,"lastBatchID":0})
-                print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
-                response = sns.publish(**kwargs)
-                print('Received Response: {}'.format(json.dumps(response)))
-            snsData = []
-            tot_size = cur_size
-            snsData.append(slice_datum)
+                deleteTempFile(APIid,batchID)
+                break
+            else:
+                results = []
+                tot_size = cur_size
+                results.append(data)
 
         if(idx == finalData):
             counter += 1
@@ -113,33 +147,34 @@ def publish_consequences_plugin(slice_data,APIid,batchID,lastBatchID):
             #createTempFile(APIid,uniqueBatchID)
             #files = counter * num
             for topic in topics:
-                tempFileName = APIid+"_"+batchID+"_"+topic
-                createTempFile(tempFileName)
-                kwargs["TopicArn"] = topic
-                kwargs['Message'] = json.dumps({ "snsData" : snsData, "APIid":APIid,"batchID":uniqueBatchID,"tempFileName":tempFileName,"lastBatchID":lastBatchID})
-                print('Publishing to SNS: {}'.format(kwargs))
-                response = sns.publish(**kwargs)
-                print('Received Response: {}'.format(json.dumps(response)))
+                tempFileName = APIid+"_"+uniqueBatchID+"_"+topic
+                sendDatatoPlugins(topic,results,APIid,uniqueBatchID,tempFileName,lastBatchID)#within lastbatchid - we only want to send the last batch created value of 1..
+                #print('Received Response: {}'.format(json.dumps(response)))
+            #if(originalBatchID != None):
+            #    deleteTempFile(APIid,originalBatchID)
+            #else:
             deleteTempFile(APIid,batchID)
-            #updateDataset(APIid,batchID,files)
 
-
-
-
-
-def annotate_slice(all_coords, all_changes,APIid,batchID,lastBatchID):
-        overlap_list = overlap_feature(all_coords,all_changes)
-        publish_consequences_plugin(overlap_list,APIid,batchID,lastBatchID)
 
 def lambda_handler(event, context):
     print('Event Received: {}'.format(json.dumps(event)))
+    time_assigned = (context.get_remaining_time_in_millis()
+                     - MILLISECONDS_BEFORE_SPLIT)
     ################test#################
     #message = json.loads(event['Message'])
     #######################################
     message = json.loads(event['Records'][0]['Sns']['Message'])
     coords = message['coords']
-    changes = message['changes']
     APIid = message['APIid']
     batchID = message['batchID']
     lastBatchID = message['lastBatchID']
-    annotate_slice(coords,changes,APIid,batchID,lastBatchID)
+    #originalBatchID = None
+    #if('originalBatchID' in message):
+    #    originalBatchID = message['originalBatchID']
+
+    BUCKET_NAME = 'svep'
+    keys = ['sorted_filtered_Homo_sapiens.GRCh38.98.chr.gtf.gz', 'sorted_filtered_Homo_sapiens.GRCh38.98.chr.gtf.gz.tbi']
+    moveReferenceDataToTMP(BUCKET_NAME,keys)
+    startTime = time.time()
+    overlap_feature(coords,APIid,batchID,lastBatchID,time_assigned,startTime)
+    print("This lambda is done. time taken = ", (time.time() - startTime)*1000)

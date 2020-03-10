@@ -919,40 +919,7 @@ our %OVERLAP_CONSEQUENCES = (
   'tier' => '3',
   'variant_feature_class' => 'consequence::BaseVariationFeature'
 }
-),
-'protein_altering_variant' => consequence::OverlapConsequence->new_fast({
-  'SO_accession' => 'SO:0001818',
-  'SO_term' => 'protein_altering_variant',
-  'description' => 'A sequence_variant which is predicted to change the protein encoded in the coding sequence',
-  'feature_SO_term' => 'mRNA',
-  'feature_class' => 'consequence::Transcript',
-  'impact' => 'MODERATE',
-  'include' => {
-                 'coding' => 1
-               },
-  'label' => 'protein altering variant',
-  'predicate' => 'consequence::VariationEffect::protein_altering_variant',
-  'rank' => '12',
-  'tier' => '3',
-  'variant_feature_class' => 'consequence::VariationFeature'
-}
-),
-);
-
-our $SO_ACC_MAPPER = {
-  'Bio::EnsEMBL::Variation::StructuralVariationFeature' => {
-                                                             'acc' => 'SO:0001537',
-                                                             'term' => 'structural_variant'
-                                                           },
-  'consequence::VariationFeature' => {
-                                                   'acc' => 'SO:0001060',
-                                                   'term' => 'sequence_variant'
-                                                 }
-}
-;
-
-=head2 addLater
-'splice_donor_variant' => consequence::OverlapConsequence->new_fast({
+),'splice_donor_variant' => consequence::OverlapConsequence->new_fast({
   'NCBI_term' => 'splice-5',
   'SO_accession' => 'SO:0001575',
   'SO_term' => 'splice_donor_variant',
@@ -1008,8 +975,38 @@ our $SO_ACC_MAPPER = {
   'variant_feature_class' => 'consequence::VariationFeature'
 }
 ),
+'protein_altering_variant' => consequence::OverlapConsequence->new_fast({
+  'SO_accession' => 'SO:0001818',
+  'SO_term' => 'protein_altering_variant',
+  'description' => 'A sequence_variant which is predicted to change the protein encoded in the coding sequence',
+  'feature_SO_term' => 'mRNA',
+  'feature_class' => 'consequence::Transcript',
+  'impact' => 'MODERATE',
+  'include' => {
+                 'coding' => 1
+               },
+  'label' => 'protein altering variant',
+  'predicate' => 'consequence::VariationEffect::protein_altering_variant',
+  'rank' => '12',
+  'tier' => '3',
+  'variant_feature_class' => 'consequence::VariationFeature'
+}
+),
+);
 
-=cut
+our $SO_ACC_MAPPER = {
+  'Bio::EnsEMBL::Variation::StructuralVariationFeature' => {
+                                                             'acc' => 'SO:0001537',
+                                                             'term' => 'structural_variant'
+                                                           },
+  'consequence::VariationFeature' => {
+                                                   'acc' => 'SO:0001060',
+                                                   'term' => 'sequence_variant'
+                                                 }
+}
+;
+
+
 
 
 1;

@@ -411,7 +411,7 @@ sub tables{
 
 sub translate {
     my ($self, $seq, $complete_codon,$frame) = @_;
-    $self->throw("Calling translate without a seq argument!") unless defined $seq;
+    #$self->throw("Calling translate without a seq argument!") unless defined $seq;
     return '' unless $seq;
     $seq = substr($seq , $frame);
 

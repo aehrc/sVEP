@@ -482,7 +482,17 @@ sub donor_splice_site {
     $bvfo ||= $bvfoa->base_variation_feature_overlap;
     $feat ||= $bvfo->feature;
 
-    my $ie = $bvfoa->_intron_effects($feat, $bvfo, $bvf);
+    my $ie = {};
+    if(length $feat->{'five_prime_utr'}){
+      if($feat->{'five_prime_utr'} == 1 && $feat->{'intron_boundary'} == 1 && $feat->{'splice_donor_variant'} ==1){
+        $ie->{start_splice_site} =1;
+        $ie->{end_splice_site} =1;
+      }else{
+        return 0;
+      }
+    }else{
+      return 0;
+    }
 
     return $feat->strand == 1 ?
         $ie->{start_splice_site} :
@@ -494,7 +504,17 @@ sub acceptor_splice_site {
     $bvfo ||= $bvfoa->base_variation_feature_overlap;
     $feat ||= $bvfo->feature;
 
-    my $ie = $bvfoa->_intron_effects($feat, $bvfo, $bvf);
+    my $ie = {};
+    if(length $feat->{'three_prime_utr'}){
+      if($feat->{'three_prime_utr'} == 1 && $feat->{'intron_boundary'} == 1 && $feat->{'splice_acceptor_variant'} ==1){
+        $ie->{start_splice_site} =1;
+        $ie->{end_splice_site} =1;
+      }else{
+        return 0;
+      }
+    }else{
+      return 0;
+    }
 
     return $feat->strand == 1 ?
         $ie->{end_splice_site} :
@@ -513,7 +533,8 @@ sub splice_region {
     return 0 if acceptor_splice_site(@_);
     return 0 if essential_splice_site(@_);
 
-    return $bvfoa->_intron_effects($feat, $bvfo, $bvf)->{splice_region};
+    #return $bvfoa->_intron_effects($feat, $bvfo, $bvf)->{splice_region};
+    return 1 unless $feat->{'intron_boundary'} == 0;
 }
 
 sub within_intron {
@@ -663,7 +684,7 @@ sub complex_indel {
 sub _get_peptide_alleles {
     my ($bvfoa, $feat, $bvfo, $bvf) = @_;
     my $cache = $bvfoa->{_predicate_cache} ||= {};
-
+    my @alleles = ();
     #print Dumper $feat;
     my $ref_seq = $feat->{'seq'};
     my $alt_seq = $ref_seq;
@@ -673,8 +694,14 @@ sub _get_peptide_alleles {
     my $ref_allele = $feat->{'ref_allele'};
     my $alt_allele = $feat->{'alt_allele'};
     my $var_loc =  $feat->{'position'} - $feat->{'cdna_coding_start'};
-    if(substr($ref_seq, $var_loc, length $ref_allele) =~ $ref_allele){
+    if(substr($ref_seq, $var_loc, length $ref_allele) =~ $ref_allele || $alt_allele eq "-"){
       substr($alt_seq, $var_loc, length $alt_allele) = $alt_allele
+    }elsif($ref_allele eq "-"){
+      substr($alt_seq, $var_loc, 0) = $alt_allele;
+    }else{
+      $feat->{warning} = "REF doesn't match GRCh38 reference at given position";
+      substr($ref_seq, $var_loc, length $ref_allele) = $ref_allele;
+      substr($alt_seq, $var_loc, length $alt_allele) = $alt_allele;
     }
     my $strand = $feat->{'strand'};
     my $frame = $feat->{'cds_frame'};
@@ -697,9 +724,22 @@ sub _get_peptide_alleles {
        $alt_pep_allele = substr($alt_seq, $i, 3);
     }
 
+    if(!length $ref_pep_allele &&  !length $alt_pep_allele) {
+      $feat->{warning} = "Frame removes the variant position out of equation";
+      $bvfo->{startRef} = substr($ref_seq, $frame, 3);
+      $bvfo->{startAlt} = substr($alt_seq, $frame, 3);
+      @alleles = ($ref_pep, $alt_pep);
+      $cache->{_get_peptide_alleles} = \@alleles;
+      return @{$cache->{_get_peptide_alleles}};
+    }
+
 
     my $ref_aa = consequence::CodonTable->translate( $ref_pep_allele, 1);
     my $alt_aa = consequence::CodonTable->translate( $alt_pep_allele, 1);
+    if($ref_allele eq "-"){
+      $alt_pep_allele .= substr($alt_seq, $var_loc+1, length $alt_allele);
+      $alt_aa .='X';
+    }
     #print("$ref_aa\n$alt_aa\n");
     #print("$ref_pep_allele\n$alt_pep_allele\n");
     #exit();
@@ -707,8 +747,13 @@ sub _get_peptide_alleles {
     my @alleles = ();
     @alleles = ($ref_pep, $alt_pep);
     $cache->{_get_peptide_alleles} = \@alleles;
+    $feat->{altCodon} = $alt_pep_allele;
+    $feat->{refCodon} = $alt_pep_allele;
     $feat->{codons} = $ref_pep_allele."/".$alt_pep_allele;
     $feat->{aa} = $ref_aa eq $alt_aa ? $ref_aa : $ref_aa."/".$alt_aa;
+
+    $bvfo->{startRef} = substr($ref_seq, $frame, 3);
+    $bvfo->{startAlt} = substr($alt_seq, $frame, 3);
 
     return @{$cache->{_get_peptide_alleles}};
 }
@@ -769,12 +814,12 @@ sub _get_codon_alleles {
 
     return () if frameshift(@_);
 
-    my $alt_codon = $bvfoa->codon;
+    my $alt_codon = $feat->{altCodon};
 
     return () unless defined $alt_codon;
 
     $bvfo ||= $bvfoa->base_variation_feature_overlap;
-    my $ref_codon = $bvfo->get_reference_TranscriptVariationAllele->codon;
+    my $ref_codon = $feat->{refCodon};
 
     return () unless defined $ref_codon;
 
@@ -805,7 +850,8 @@ sub _get_alleles {
 
 sub start_lost {
     my ($bvfoa, $feat, $bvfo, $bvf) = @_;
-
+    my ($ref_pep, $alt_pep) = _get_peptide_alleles(@_);
+    return 0 unless $bvfo->{startRef} ne $bvfo->{startAlt};
     # use cache for this method as it gets called a lot
     my $cache = $bvfoa->{_predicate_cache} ||= {};
 
@@ -944,8 +990,9 @@ sub _ins_del_start_altered {
 
     unless(exists($cache->{ins_del_start_altered})) {
         $cache->{ins_del_start_altered} = 0;
+        my ($ref_pep, $alt_pep) = _get_peptide_alleles(@_);
 
-        return 0 if $bvfoa->isa('Bio::EnsEMBL::Variation::TranscriptStructuralVariationAllele');
+        return 0 if $bvfoa->isa('consequence::TranscriptStructuralVariationAllele');
         return 0 unless $bvfoa->seq_is_unambiguous_dna();
         return 0 unless _overlaps_start_codon(@_);
 
@@ -955,23 +1002,26 @@ sub _ins_del_start_altered {
         $bvfo ||= $bvfoa->base_variation_feature_overlap;
 
         # get cDNA coords
-        my ($cdna_start, $cdna_end) = ($bvfo->cdna_start, $bvfo->cdna_end);
+        my ($cdna_start, $cdna_end) = ($feat->{'cdna_coding_start'}, $feat->{'cdna_coding_end'});
         return 0 unless $cdna_start && $cdna_end;
 
         # make and edit UTR + translateable seq
         my $translateable = $bvfo->_translateable_seq();
-        my $utr = $bvfo->_five_prime_utr();
-        my $utr_and_translateable = ($utr ? $utr->seq : '').$translateable;
+        if ($bvfo->{startRef} eq $bvfo->{startAlt}){
+          return 1;
+        }
+        #my $utr = $bvfo->_five_prime_utr();
+        #my $utr_and_translateable = ($utr ? $utr->seq : '').$translateable;
 
-        my $vf_feature_seq = $bvfoa->feature_seq;
-        $vf_feature_seq = '' if $vf_feature_seq eq '-';
+        #my $vf_feature_seq = $bvfoa->feature_seq;
+        #$vf_feature_seq = '' if $vf_feature_seq eq '-';
 
-        substr($utr_and_translateable, $cdna_start - 1, ($cdna_end - $cdna_start) + 1) = $vf_feature_seq;
+        #substr($utr_and_translateable, $cdna_start - 1, ($cdna_end - $cdna_start) + 1) = $vf_feature_seq;
 
         # sequence shorter, we know it has been altered
-        return $cache->{ins_del_start_altered} = 1 if length($utr_and_translateable) < length($translateable);
+        #return $cache->{ins_del_start_altered} = 1 if length($utr_and_translateable) < length($translateable);
 
-        $cache->{ins_del_start_altered} = $translateable ne substr($utr_and_translateable, 0 - length($translateable));
+        #$cache->{ins_del_start_altered} = $translateable ne substr($utr_and_translateable, 0 - length($translateable));
     }
 
     return $cache->{ins_del_start_altered};
@@ -1068,7 +1118,7 @@ sub inframe_deletion {
     $bvf  ||= $bvfo->base_variation_feature;
 
     # sequence variant
-    if($bvf->isa('Bio::EnsEMBL::Variation::VariationFeature')) {
+    if($bvf->isa('consequence::VariationFeature')) {
         return 0 if partial_codon(@_);
 
         my ($ref_codon, $alt_codon) = _get_codon_alleles(@_);
@@ -1150,7 +1200,7 @@ sub stop_lost {
         $feat ||= $bvfo->feature;
 
         # sequence variant
-        if($bvfoa->isa('Bio::EnsEMBL::Variation::TranscriptVariationAllele')) {
+        if($bvfoa->isa('consequence::TranscriptVariationAllele')) {
 
             # special case frameshift
     #        if(frameshift(@_)) {
@@ -1244,7 +1294,7 @@ sub _overlaps_stop_codon {
 
         $bvfo ||= $bvfoa->base_variation_feature_overlap;
         $feat ||= $bvfo->feature;
-        return 0 if grep {$_->code eq 'cds_end_NF'} @{$feat->get_all_Attributes()};
+        #return 0 if grep {$_->code eq 'cds_end_NF'} @{$feat->get_all_Attributes()};
 
         my ($cdna_start, $cdna_end) = ($bvfo->cdna_start, $bvfo->cdna_end);
         return 0 unless $cdna_start && $cdna_end;
@@ -1317,15 +1367,15 @@ sub frameshift {
     $bvfo ||= $bvfoa->base_variation_feature_overlap;
 
     # sequence variant
-    if($bvfoa->isa('Bio::EnsEMBL::Variation::TranscriptVariationAllele')) {
+    if($bvfoa->isa('consequence::TranscriptVariationAllele')) {
 
         return 0 if partial_codon(@_);
 
-        return 0 unless defined $bvfo->cds_start && defined $bvfo->cds_end;
+        return 0 unless defined $feat->{cdna_coding_start} && defined $feat->{cdna_coding_end};
 
-        my $var_len = $bvfo->cds_end - $bvfo->cds_start + 1;
+        my $var_len = $feat->{cdna_coding_end} - $feat->{cdna_coding_start} + 1;
 
-        my $allele_len = $bvfoa->seq_length;
+        my $allele_len = $feat->{seq_length};
 
         # if the allele length is undefined then we can't call a frameshift
 

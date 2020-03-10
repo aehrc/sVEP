@@ -278,7 +278,7 @@ sub get_all_OverlapConsequences {
         }
       }
     }
-    
+
 
     $cons = [$DEFAULT_OVERLAP_CONSEQUENCE] unless @$cons;
     #print($cons);
@@ -499,6 +499,9 @@ sub _bvfo_preds {
       $self->_update_preds($bvfo_preds, $feat->{biotype}, 1, \$pred_digest);
       if(exists($bvf->{'intron'}) ){
         $self->_update_preds($preds, 'intron', 1, \$pred_digest);
+      }
+      if(exists($feat->{'intron_boundary'}) &&  $feat->{'intron_boundary'} == 1){
+        $self->_update_preds($preds, 'intron_boundary', 1, \$pred_digest);
       }
 
       # find any overlapping introns, intron boundary regions and exons

@@ -24,7 +24,7 @@ data "aws_iam_policy_document" "lambda-queryVCF" {
     resources = [
       "${aws_sns_topic.queryGTF.arn}",
       "${aws_sns_topic.queryVCFExtended.arn}",
-      "${aws_sns_topic.concat.arn}",
+      "${aws_sns_topic.queryVCFsubmit.arn}",
     ]
   }
   statement {
@@ -48,7 +48,29 @@ data "aws_iam_policy_document" "lambda-queryVCFExtended" {
     resources = [
       "${aws_sns_topic.queryGTF.arn}",
       "${aws_sns_topic.queryVCFExtended.arn}",
-      "${aws_sns_topic.concat.arn}",
+      "${aws_sns_topic.queryVCFsubmit.arn}",
+    ]
+  }
+  statement {
+    actions = [
+      "s3:GetObject",
+      "s3:ListBucket",
+      "s3:PutObject",
+    ]
+    resources = ["*"]
+  }
+}
+
+#
+# queryVCFsubmit Lambda Function
+#
+data "aws_iam_policy_document" "lambda-queryVCFsubmit" {
+  statement {
+    actions = [
+      "SNS:Publish",
+    ]
+    resources = [
+      "${aws_sns_topic.queryGTF.arn}",
     ]
   }
   statement {
@@ -73,6 +95,7 @@ data "aws_iam_policy_document" "lambda-queryGTF" {
     resources = [
       "${aws_sns_topic.pluginConsequence.arn}",
       "${aws_sns_topic.pluginUpdownstream.arn}",
+      "${aws_sns_topic.queryGTF.arn}",
     ]
   }
   statement {
@@ -147,6 +170,54 @@ data "aws_iam_policy_document" "lambda-concat" {
     ]
     resources = [
       "${aws_sns_topic.concat.arn}",
+      "${aws_sns_topic.createPages.arn}",
+    ]
+  }
+}
+
+#
+# createPages Lambda Function
+#
+data "aws_iam_policy_document" "lambda-createPages" {
+  statement {
+    actions = [
+      "s3:GetObject",
+      "s3:ListBucket",
+      "s3:PutObject",
+      "s3:DeleteObject",
+    ]
+    resources = ["*"]
+  }
+  statement {
+    actions = [
+      "SNS:Publish",
+    ]
+    resources = [
+      "${aws_sns_topic.concat.arn}",
+      "${aws_sns_topic.concatPages.arn}",
+    ]
+  }
+}
+
+#
+# concatPages Lambda Function
+#
+data "aws_iam_policy_document" "lambda-concatPages" {
+  statement {
+    actions = [
+      "s3:GetObject",
+      "s3:ListBucket",
+      "s3:PutObject",
+      "s3:DeleteObject",
+    ]
+    resources = ["*"]
+  }
+  statement {
+    actions = [
+      "SNS:Publish",
+    ]
+    resources = [
+      "${aws_sns_topic.concatPages.arn}",
     ]
   }
 }
