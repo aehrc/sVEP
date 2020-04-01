@@ -75,6 +75,7 @@ use consequence::TranscriptVariationAllele;
 
 my $config = {};
 my $fastaLocation =  $ENV{'REFERENCE_LOCATION'};
+my $spliceFile =  $ENV{'SPLICE_REFERENCE'};
 my $outputLocation =  $ENV{'SVEP_REGIONS'};
 my $tempLocation =  $ENV{'SVEP_TEMP'};
 sub handle {
@@ -100,9 +101,10 @@ sub handle {
 
     #print Dumper @data;
     my $chr = $data[0][0]->{'chrom'};
-    print($chr);
+    #print($chr);
     my $fasta ='Homo_sapiens.GRCh38.dna.chromosome.'.$chr.'.fa.gz';
     system("/opt/awscli/aws s3 cp $fastaLocation /tmp/ --recursive  --exclude '*'  --include '$fasta*'");
+    system("/opt/awscli/aws s3 cp $fastaLocation /tmp/ --recursive  --exclude '*'  --include '$spliceFile*'");
     my @results;
     while(@data){
       my $region = shift @data;
@@ -124,9 +126,11 @@ sub handle {
 
     my $out = 's3://'.$outputLocation.'/';
     system("/opt/awscli/aws s3 cp $filename $out");
-    print("Done Copying");
+    #print("Done Copying");
     my $tempOut = 's3://'.$tempLocation.'/'.$tempFileName;
     system("/opt/awscli/aws s3 rm $tempOut");
+    print("cleaning tmp");
+    system("rm -r /tmp/*"); #cleaning tmp after each use
     print("Done Copying");
 }
 
@@ -224,6 +228,7 @@ sub parse_vcf {
     my %transcriptHash;
     $transcriptHash{$_}++ for (@uniqueTranscriptIds);
 
+    my $intron_result;
     foreach my $transcript (@transcripts){
       my @rows = (split /\t/, $transcript,-1);
       #print Dumper @rows;
@@ -251,8 +256,15 @@ sub parse_vcf {
             $value1 =~ s/"//g;
             $info{'exon_number'} = $value1;
           }
-          if($featurerows[2] eq "CDS"){
+          if($featurerows[2] eq "CDS" ){
             $info{'CDS'} = 1;
+            $info{'CDS_start'} = $featurerows[3];
+            $info{'CDS_end'} = $featurerows[4];
+            $info{'CDS_frame'} = $featurerows[7];
+          }
+          if( $featurerows[2] eq "start_codon" || $featurerows[2] eq "stop_codon"){ #COULD ALSO BE start or stop codon
+            $info{'CDS'} = 1;
+            $info{'start_stop'} = 1;
             $info{'CDS_start'} = $featurerows[3];
             $info{'CDS_end'} = $featurerows[4];
             $info{'CDS_frame'} = $featurerows[7];
@@ -282,7 +294,14 @@ sub parse_vcf {
         $strand = -1;
       }
 
-
+      if( !$intron_result ){
+        my $file = "/tmp/".$spliceFile;
+        my $intronStart = $start - 8;
+        my $intronEnd = $start + 8;
+        my $location = $chr.":".$intronStart."-".$intronEnd;
+        $intron_result =  `./tabix $file $location`;
+        #print("\n Intron result = $intron_result")
+      }
 
       if(exists($info{'exon'})){
 
@@ -301,7 +320,7 @@ sub parse_vcf {
             exon         => 1,
         });
         my $intron_boundary;
-
+        my $splice_region_variant =0;
         if(exists($info{'CDS'})){
           my $location = $chr.':'.$info{'CDS_start'}.'-'.$info{'CDS_end'};
           my $fasta ='Homo_sapiens.GRCh38.dna.chromosome.'.$chr.'.fa.gz';
@@ -312,9 +331,13 @@ sub parse_vcf {
           $seq =~ s/[\r\n]+//g;
           $length = ($info{'CDS_end'}-$info{'CDS_start'},$info{'CDS_start'}-$info{'CDS_end'})[$info{'CDS_end'}-$info{'CDS_start'} < $info{'CDS_start'}-$info{'CDS_end'}];
 
-          if( (($info{'CDS_end'} - $start) < 4) || (($start - $info{'CDS_start'}  ) < 4) ){
+          if( (($info{'CDS_end'} - $start) =~ /^[1-3]$/) || (($start - $info{'CDS_start'} ) =~ /^[1-3]$/) ){
             $intron_boundary =1;
+            $splice_region_variant =1;
           }else{
+            $intron_boundary =0;
+          }
+          if(exists($info{'start_stop'} )){
             $intron_boundary =0;
           }
 
@@ -329,6 +352,7 @@ sub parse_vcf {
               end => $rows[4],
               cds => 1,
               intron_boundary => $intron_boundary,
+              splice_region_variant => $splice_region_variant,
               cdna_coding_start => $info{'CDS_start'},
               cdna_coding_end => $info{'CDS_end'},
               cds_frame => $info{'CDS_frame'},
@@ -340,11 +364,18 @@ sub parse_vcf {
               alt_allele => $alt,
           });
         }elsif(exists($info{'three_prime_utr'}) ){
-          if( (($info{'exon_end'} - $start) < 3) || (($start - $info{'exon_start'}  ) < 3) ){
+          if(  ((($info{'exon_end'} - $start) =~ /^[1-3]$/ )|| (($start - $info{'exon_start'}) =~ /^[1-3]$/ ) )) {
             $intron_boundary =1;
+            $splice_region_variant=1;
           }else{
             $intron_boundary =0;
+            $splice_region_variant =0
           }
+          if($info{'exon_end'} == $start || $info{'exon_start'} == $start){
+            $splice_region_variant =0;
+          #  print("here");
+          }
+
           $tr = consequence::Transcript->new_fast({
               stable_id          => $info{transcript_id},
               version            => $info{transcript_version},
@@ -359,7 +390,7 @@ sub parse_vcf {
               exon_end => $info{'exon_end'},
               strand => $strand,
               intron_boundary => $intron_boundary,
-              splice_acceptor_variant => 1,
+              splice_region_variant => $splice_region_variant,
               #seq => $seq,
               #seq_length => $length,
               position => $start,
@@ -367,11 +398,18 @@ sub parse_vcf {
               alt_allele => $alt,
           });
         }elsif(exists($info{'five_prime_utr'})){
-          if( (($info{'exon_end'} - $start) < 3) || (($start - $info{'exon_start'}  ) < 3) ){
+          if( (($info{'exon_end'} - $start) =~ /^[1-3]$/) || (($start - $info{'exon_start'}) =~ /^[1-3]$/) ){
             $intron_boundary =1;
+            $splice_region_variant = 1;
           }else{
             $intron_boundary =0;
+            $splice_region_variant =0;
           }
+          if($info{'exon_end'} == $start || $info{'exon_start'} == $start){
+            $splice_region_variant =0;
+          #  print("here");
+          }
+
           $tr = consequence::Transcript->new_fast({
               stable_id          => $info{transcript_id},
               version            => $info{transcript_version},
@@ -385,7 +423,7 @@ sub parse_vcf {
               exon_start => $info{'exon_start'},
               exon_end => $info{'exon_end'},
               strand => $strand,
-              splice_donor_variant => 1,
+              splice_region_variant => $splice_region_variant,
               intron_boundary => $intron_boundary,
               #seq => $seq,
               #seq_length => $length,
@@ -394,10 +432,16 @@ sub parse_vcf {
               alt_allele => $alt,
           });
         }else{
-          if( (($info{'exon_end'} - $start) < 4) || (($start - $info{'exon_start'}  ) < 4) ){
+          if( (($info{'exon_end'} - $start) =~ /^[1-3]$/) || (($start - $info{'exon_start'}  ) =~ /^[1-3]$/) ){
             $intron_boundary =1;
+            $splice_region_variant = 1;
           }else{
             $intron_boundary =0;
+            $splice_region_variant =0;
+          }
+          if($info{'exon_end'} == $start || $info{'exon_start'} == $start){
+            $splice_region_variant =0;
+          #  print("here");
           }
           $tr = consequence::Transcript->new_fast({
               stable_id          => $info{transcript_id},
@@ -412,6 +456,7 @@ sub parse_vcf {
               exon_start => $info{'exon_start'},
               exon_end => $info{'exon_end'},
               intron_boundary => $intron_boundary,
+              splice_region_variant => $splice_region_variant,
               #seq => $seq,
               #seq_length => $length,
               position => $start,
@@ -445,7 +490,47 @@ sub parse_vcf {
             position => $start,
             ref_allele => $ref,
             alt_allele => $alt,
+            #intron_boundary => 1,
         });
+
+        for my $tran (split /[\r\n]+/, $intron_result){
+          my @info = (split '\t', $tran);
+          if( ($info[6] eq '+') && $info{transcript_id} eq $info[7] ){
+            if(($info[3] > $start) && ( $info[3] - $start) < 3){
+              #print("\nsplice_acceptor_variant\n");
+              $tr->{'splice_acceptor_variant'} =1;
+              $tr->{'intron_boundary'} =1;
+              $vf->{'intron'} = 0;
+              last;
+            }elsif( ($start > $info[4]) && ( $start - $info[4]) < 3){
+              #print("\nsplice_donor_variant 1\n");
+              $tr->{'splice_donor_variant'} =1;
+              $tr->{'intron_boundary'} =1;
+              $vf->{'intron'} = 0;
+              last;
+            }
+          }elsif( ($info[6] eq '-') && $info{transcript_id} eq $info[7]  ){
+            if(($info[3] > $start) &&( $info[3] - $start) < 3){
+              #print("\nsplice_donor_variant 2\n");
+              $tr->{'splice_donor_variant'} =1;
+              $tr->{'intron_boundary'} =1;
+              $vf->{'intron'} = 0;
+              last;
+            }elsif( ($start > $info[4]) && ( $start - $info[4]) < 3){
+              #print("\nsplice_acceptor_variant\n");
+              $tr->{'splice_acceptor_variant'} =1;
+              $tr->{'intron_boundary'} =1;
+              $vf->{'intron'} = 0;
+              last;
+            }
+          #elsif( ($start > $info[4] ) &&($start - $info[4]) <3){
+
+          }elsif( (( ($info[3] - $start) > 0) &&(($info[3] - $start) < 8) && $info{transcript_id} eq $info[7])|| (( ($start - $info[4]) > 0)&&(($start - $info[4]) < 8) && $info{transcript_id} eq $info[7]) ) {
+            $tr->{'splice_region_variant'} =1;
+            $tr->{'intron_boundary'} =1;
+            #last;
+          }
+        }
 
       }
 

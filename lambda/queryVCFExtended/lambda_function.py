@@ -87,9 +87,9 @@ def submitQueryGTF(regions_process, requestID, regionID,lastBatchID,time_assigne
     }
     test = time.time()
     regions_list = regions_process.stdout.read().splitlines()
-    print("read  time = ",(time.time() - test)*1000)
+    #print("read  time = ",(time.time() - test)*1000)
     total_coords = [regions_list[x:x+RECORDS_PER_SAMPLE] for x in range(0, len(regions_list), RECORDS_PER_SAMPLE)]
-    print("read and split data time = ",(time.time() - test)*1000)
+    #print("read and split data time = ",(time.time() - test)*1000)
 
     print("length = ",len(total_coords) )
     finalData = len(total_coords) - 1
@@ -109,7 +109,7 @@ def submitQueryGTF(regions_process, requestID, regionID,lastBatchID,time_assigne
                     kwargs['Message'] = json.dumps({'coords' : remainingCoords,'requestID' : requestID, 'batchID': batchID,'lastBatchID': 0})
                 print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
                 response = sns.publish(**kwargs)
-                print('Received Response: {}'.format(json.dumps(response)))
+                #print('Received Response: {}'.format(json.dumps(response)))
                 break
             else: # Since coords are generally similar size because its made of chr, loc, ref, alt - we know 10batches of 700 records can be handled by SNS
 
@@ -122,11 +122,12 @@ def submitQueryGTF(regions_process, requestID, regionID,lastBatchID,time_assigne
                         kwargs['Message'] = json.dumps({'coords' : newRemainingCoords,'requestID' : requestID, 'batchID': newBatchID,'lastBatchID': 0})
                     print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
                     response = sns.publish(**kwargs)
-                    print('Received Response: {}'.format(json.dumps(response)))
+                    #print('Received Response: {}'.format(json.dumps(response)))
                 break
 
         else:
             if((idx == finalData) and (lastBatchID == 1) ):
+                print("last Batch")
                 batchID = regionID+"_"+str(idx)
                 print(batchID)
                 createTempFile(requestID,batchID)
@@ -150,24 +151,26 @@ def submitQueryGTF(regions_process, requestID, regionID,lastBatchID,time_assigne
                 })
             print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
             response = sns.publish(**kwargs)
-            print('Received Response: {}'.format(json.dumps(response)))
+            #print('Received Response: {}'.format(json.dumps(response)))
         #return(batchID)
 
 def lambda_handler(event, context):
     print('Event Received: {}'.format(json.dumps(event)))
     time_assigned = (context.get_remaining_time_in_millis()-MILLISECONDS_BEFORE_SPLIT)
     time_assigned_second_split = (context.get_remaining_time_in_millis()-MILLISECONDS_BEFORE_SECOND_SPLIT)
-    print("time assigned",time_assigned)
+    #print("time assigned",time_assigned)
     timeStart = time.time()
     message = json.loads(event['Records'][0]['Sns']['Message'])
     vcf_regions = message['regions']
     requestID = message['requestID']
     location = message['location']
     batchID = ''
-    print(vcf_regions)
+    #print(vcf_regions)
     finalData = len(vcf_regions) - 1
     for index,region in enumerate(vcf_regions):
+        #print(vcf_regions[index])
         if( (time.time() - timeStart)*1000 > time_assigned):
+
             newRegions = vcf_regions[index:]
             batchID = ''
             print("New Regions ",newRegions)
@@ -178,9 +181,10 @@ def lambda_handler(event, context):
             kwargs['Message'] = json.dumps({'regions' : newRegions,'requestID' : requestID, 'location': location})
             print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
             response = sns.publish(**kwargs)
-            print('Received Response: {}'.format(json.dumps(response)))
+            #print('Received Response: {}'.format(json.dumps(response)))
             break
         else:
+
             chrom, start_str = region.split(':')
             regionID = chrom+"_"+start_str
             start = round(1000000 * float(start_str) + 1)

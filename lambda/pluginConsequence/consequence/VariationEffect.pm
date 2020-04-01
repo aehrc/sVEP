@@ -482,43 +482,33 @@ sub donor_splice_site {
     $bvfo ||= $bvfoa->base_variation_feature_overlap;
     $feat ||= $bvfo->feature;
 
-    my $ie = {};
-    if(length $feat->{'five_prime_utr'}){
-      if($feat->{'five_prime_utr'} == 1 && $feat->{'intron_boundary'} == 1 && $feat->{'splice_donor_variant'} ==1){
-        $ie->{start_splice_site} =1;
-        $ie->{end_splice_site} =1;
-      }else{
-        return 0;
-      }
-    }else{
-      return 0;
-    }
+    my $cache = $bvfoa->{_predicate_cache} ||= {};
+    #unless(exists($cache->{splice_donor_variant})) {
+    #    $cache->{splice_donor_variant} = 0;
+        if(length $feat->{'splice_donor_variant'}){ #$feat->{'three_prime_utr'} == 1 &&
+          return $cache->{splice_donor_variant} = 1 if ( $feat->{'intron_boundary'} == 1 && $feat->{'splice_donor_variant'} ==1);
+        }
+    #  }
 
-    return $feat->strand == 1 ?
-        $ie->{start_splice_site} :
-        $ie->{end_splice_site};
+    #print("\nsplice regions = ", $cache->{splice_donor_variant},"\n");
+    #return $cache->{splice_donor_variant};
+    return 0;
 }
 
 sub acceptor_splice_site {
     my ($bvfoa, $feat, $bvfo, $bvf) = @_;
     $bvfo ||= $bvfoa->base_variation_feature_overlap;
     $feat ||= $bvfo->feature;
-
-    my $ie = {};
-    if(length $feat->{'three_prime_utr'}){
-      if($feat->{'three_prime_utr'} == 1 && $feat->{'intron_boundary'} == 1 && $feat->{'splice_acceptor_variant'} ==1){
-        $ie->{start_splice_site} =1;
-        $ie->{end_splice_site} =1;
-      }else{
-        return 0;
+    my $cache = $bvfoa->{_predicate_cache} ||= {};
+    #unless(exists($cache->{splice_acceptor_variant})) {
+    #  $cache->{splice_acceptor_variant} = 0;
+      if(length $feat->{'splice_acceptor_variant'}){ #$feat->{'three_prime_utr'} == 1 &&
+        return $cache->{splice_acceptor_variant} = 1 if ( $feat->{'intron_boundary'} == 1 && $feat->{'splice_acceptor_variant'} ==1);
       }
-    }else{
-      return 0;
-    }
+    #}
 
-    return $feat->strand == 1 ?
-        $ie->{end_splice_site} :
-        $ie->{start_splice_site};
+    #return $cache->{splice_acceptor_variant};
+    return 0;
 }
 
 sub essential_splice_site {
@@ -528,21 +518,30 @@ sub essential_splice_site {
 sub splice_region {
     my ($bvfoa, $feat, $bvfo, $bvf) = @_;
     $bvfo ||= $bvfoa->base_variation_feature_overlap;
+    my $cache = $bvfoa->{_predicate_cache} ||= {};
+    unless(exists($cache->{splice_region_variant})) {
+      $cache->{splice_region_variant} = 0;
 
-    return 0 if donor_splice_site(@_);
-    return 0 if acceptor_splice_site(@_);
-    return 0 if essential_splice_site(@_);
-
+      return 0 if donor_splice_site(@_);
+      return 0 if acceptor_splice_site(@_);
+      return 0 if essential_splice_site(@_);
     #return $bvfoa->_intron_effects($feat, $bvfo, $bvf)->{splice_region};
-    return 1 unless $feat->{'intron_boundary'} == 0;
+      if(length $feat->{'splice_region_variant'}){
+        if ($feat->{'intron_boundary'} == 1 && $feat->{'splice_region_variant'} == 1){
+          $cache->{splice_region_variant} = 1;
+        }
+      }
+    }
+
+    return $cache->{splice_region_variant};
 }
 
 sub within_intron {
     my ($bvfoa, $feat, $bvfo, $bvf) = @_;
     $bvfo ||= $bvfoa->base_variation_feature_overlap;
 
-    return 1 if exists($bvf->{'intron'});
-    return $bvfoa->_intron_effects($feat, $bvfo, $bvf)->{intronic};
+    return 1 if exists($bvf->{'intron'}) && $bvf->{'intron'} ==1;
+    #return $bvfoa->_intron_effects($feat, $bvfo, $bvf)->{intronic};
 }
 
 sub within_cds {
@@ -694,6 +693,9 @@ sub _get_peptide_alleles {
     my $ref_allele = $feat->{'ref_allele'};
     my $alt_allele = $feat->{'alt_allele'};
     my $var_loc =  $feat->{'position'} - $feat->{'cdna_coding_start'};
+    if($ref_seq =~"TGA|TAA|TAG"){#This is for stop retained variant where you want to check the original ref for stop
+      $feat->{stop_ref} = $ref_seq;
+    }
     if(substr($ref_seq, $var_loc, length $ref_allele) =~ $ref_allele || $alt_allele eq "-"){
       substr($alt_seq, $var_loc, length $alt_allele) = $alt_allele
     }elsif($ref_allele eq "-"){
@@ -703,6 +705,7 @@ sub _get_peptide_alleles {
       substr($ref_seq, $var_loc, length $ref_allele) = $ref_allele;
       substr($alt_seq, $var_loc, length $alt_allele) = $alt_allele;
     }
+
     my $strand = $feat->{'strand'};
     my $frame = $feat->{'cds_frame'};
     if($strand == -1){
@@ -710,19 +713,18 @@ sub _get_peptide_alleles {
       reverse_comp(\$alt_seq);
       $var_loc = $feat->{'cdna_coding_end'} - $feat->{'position'};
     }
-
-    #print("Frame is - $frame\n");
-
-    #print("$ref_seq\n$alt_seq\n");
-
-    my $ref_pep = translate($ref_seq,$frame);
-    my $alt_pep = translate($alt_seq,$frame);
-    #print("$ref_pep\n$alt_pep\n");
     my ($ref_pep_allele,$alt_pep_allele);
     for (my $i = $frame; $i <= $var_loc; $i+= 3) {
        $ref_pep_allele = substr($ref_seq, $i, 3);
        $alt_pep_allele = substr($alt_seq, $i, 3);
     }
+    if(length $ref_pep_allele != 3 && length $alt_pep_allele != 3){
+      $feat->{warning} = "Codon is out of CDS range.";
+    }
+
+    my $ref_pep = translate($ref_seq,$frame);
+    my $alt_pep = translate($alt_seq,$frame);
+
 
     if(!length $ref_pep_allele &&  !length $alt_pep_allele) {
       $feat->{warning} = "Frame removes the variant position out of equation";
@@ -744,17 +746,18 @@ sub _get_peptide_alleles {
     #print("$ref_pep_allele\n$alt_pep_allele\n");
     #exit();
 
-    my @alleles = ();
     @alleles = ($ref_pep, $alt_pep);
     $cache->{_get_peptide_alleles} = \@alleles;
     $feat->{altCodon} = $alt_pep_allele;
     $feat->{refCodon} = $alt_pep_allele;
+    $feat->{altaa} = $ref_aa;
+    $feat->{refaa} = $alt_aa;
     $feat->{codons} = $ref_pep_allele."/".$alt_pep_allele;
     $feat->{aa} = $ref_aa eq $alt_aa ? $ref_aa : $ref_aa."/".$alt_aa;
 
     $bvfo->{startRef} = substr($ref_seq, $frame, 3);
     $bvfo->{startAlt} = substr($alt_seq, $frame, 3);
-
+    $feat->{_variation_effect_feature_cache}->{peptide} = $ref_pep;
     return @{$cache->{_get_peptide_alleles}};
 }
 
@@ -778,20 +781,20 @@ sub translate {
   # desired call translatable_seq directly and produce a translation
   # from it.
   #print(CORE::length($mrna) % 3);
-  if ( CORE::length($mrna) % 3 == 0 ) {
+  #if ( CORE::length($mrna) % 3 == 0 ) {
     #print("HI");
     #print("\nAre We Here\n");
-    my $codon_table = consequence::CodonTable->new( -id => $codon_table_id );
+  #  my $codon_table = consequence::CodonTable->new( -id => $codon_table_id );
 
-    if ( $codon_table->is_ter_codon( substr( $mrna, -3, 3 ) ) ) {
-      substr( $mrna, -3, 3, '' );
-    }
-  } elsif ( CORE::length($mrna) % 3 == 2 ) {
+  #  if ( $codon_table->is_ter_codon( substr( $mrna, -3, 3 ) ) ) {
+  #    substr( $mrna, -3, 3, '' );
+  #  }
+  #} #elsif ( CORE::length($mrna) % 3 == 2 ) {
 
 	  # Otherwise trim those last two bp off so the behavior is
 	  # consistent across bioperl versions
-	  substr( $mrna, -2, 2, '' );
-  }
+	  #substr( $mrna, -2, 2, '' );
+  #}
 
   if ( CORE::length($mrna) < 1 ) { return undef }
   #print Dumper $codon_table;
@@ -854,6 +857,8 @@ sub start_lost {
     return 0 unless $bvfo->{startRef} ne $bvfo->{startAlt};
     # use cache for this method as it gets called a lot
     my $cache = $bvfoa->{_predicate_cache} ||= {};
+    $cache->{start_lost} = 0;
+    return $cache->{start_lost} = 1 if $bvfo->{startRef} ne $bvfo->{startAlt} && uc $bvfo->{startRef} eq "ATG";
 
     unless(exists($cache->{start_lost})) {
 
@@ -932,8 +937,8 @@ sub _inv_start_altered {
         #print Dumper $translateable;
 
         my $utr = $bvfo->_five_prime_utr();
-        print("\n Are we Here \n");
-	return 0 unless $utr;
+        #print("\n Are we Here \n");
+	      return 0 unless $utr;
         my $utr_and_translateable = ($utr ? $utr->seq : '').$translateable;
         my $vf_feature_seq = $bvfoa->feature_seq;
         $vf_feature_seq = '' if $vf_feature_seq eq '-';
@@ -1178,7 +1183,7 @@ sub stop_gained {
         my ($ref_pep, $alt_pep) = _get_peptide_alleles(@_);
 
         return 0 unless defined $ref_pep;
-
+        return 0 if(length $feat ->{stop_ref});
         $cache->{stop_gained} = ( ($alt_pep =~ /\*/) and ($ref_pep !~ /\*/) );
     }
     #print("\nend of function\n");
@@ -1258,13 +1263,15 @@ sub stop_retained {
         my $pre = $bvfoa->_pre_consequence_predicates;
 
         my ($ref_pep, $alt_pep) = _get_peptide_alleles(@_);
+        my $altaa = $feat->{altaa};
+        my $refaa = $feat->{refaa};
 
         if(defined($alt_pep) && $alt_pep ne '') {
-            return 0 unless $alt_pep =~/^\*/;
+            return 0 unless $altaa =~/^\*/;
 
             ## handle inframe insertion of a stop just before the stop (no ref peptide)
             if(
-              $bvfoa->isa('Bio::EnsEMBL::Variation::TranscriptVariationAllele') &&
+              $bvfoa->isa('consequence::TranscriptVariationAllele') &&
               $bvfo->_peptide &&
               $bvfo->translation_start() > length($bvfo->_peptide)
             ) {
@@ -1273,7 +1280,10 @@ sub stop_retained {
             else {
                 return 0 unless $ref_pep;
 
-                $cache->{stop_retained} = ( $alt_pep =~ /^\*/ && $ref_pep =~ /^\*/ );
+                $cache->{stop_retained} = ( $altaa =~ /^\*/ && $refaa =~ /^\*/ );
+                if($feat->{stop_ref} =~ "TGA|TAA|TAG"){
+                  $cache->{stop_retained} = ( $altaa =~ /^\*/ && $feat->{stop_ref} =~ "TGA|TAA|TAG" )
+                }
             }
         }
         else {
@@ -1385,20 +1395,20 @@ sub frameshift {
     }
 
     # structural variant
-    elsif($bvfoa->isa('Bio::EnsEMBL::Variation::TranscriptStructuralVariationAllele')) {
-        my $exons = $bvfo->_exons;
+    #elsif($bvfoa->isa('Bio::EnsEMBL::Variation::TranscriptStructuralVariationAllele')) {
+    #    my $exons = $bvfo->_exons;
 
-        return (
-            (
-                deletion(@_) or
-                copy_number_loss(@_)
-            ) and
-            scalar grep {complete_within_feature($bvfoa, $_, $bvfo, $bvf)} @$exons and
-            $bvf->length % 3 != 0
-        );
+    #    return (
+    #        (
+    #            deletion(@_) or
+    #            copy_number_loss(@_)
+    #        ) and
+    #        scalar grep {complete_within_feature($bvfoa, $_, $bvfo, $bvf)} @$exons and
+    #        $bvf->length % 3 != 0
+    #    );
 
         # TODO INSERTIONS
-    }
+    #}
 
     else {
         return 0;

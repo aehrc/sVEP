@@ -8,7 +8,7 @@ import boto3
 #global vars
 MILLISECONDS_BEFORE_SPLIT = 15000
 MILLISECONDS_BEFORE_SECOND_SPLIT = 6000
-SLICE_SIZE_MBP = 10
+SLICE_SIZE_MBP = 5
 RECORDS_PER_SAMPLE = 700
 PAYLOAD_SIZE = 262000
 s3 = boto3.resource('s3')
@@ -27,7 +27,7 @@ def createTempFile(APIid,batchID):
 def lambda_handler(event, context):
     print('Event Received: {}'.format(json.dumps(event)))
     time_assigned = (context.get_remaining_time_in_millis()-MILLISECONDS_BEFORE_SPLIT)
-    print("time assigned",time_assigned)
+    #print("time assigned",time_assigned)
     timeStart = time.time()
     message = json.loads(event['Records'][0]['Sns']['Message'])
     total_coords = message['coords']
@@ -67,5 +67,5 @@ def lambda_handler(event, context):
             })
         print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
         response = sns.publish(**kwargs)
-        print('Received Response: {}'.format(json.dumps(response)))
+        #print('Received Response: {}'.format(json.dumps(response)))
         #return(batchID)

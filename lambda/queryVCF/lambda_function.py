@@ -53,7 +53,7 @@ def get_regions(location, chrom, start, end):
     query_process = subprocess.Popen(args, stdout=subprocess.PIPE,stderr=subprocess.PIPE, cwd='/tmp',encoding='ascii')
     #print(args)
     #print(query_process.stderr.read())
-    print("get regions time = ",(time.time() - test)*1000)
+    #print("get regions time = ",(time.time() - test)*1000)
     return query_process
 
 def get_regions_and_variants(location, chrom, start, end, time_assigned):
@@ -91,10 +91,10 @@ def submitQueryGTF(regions_process, requestID, regionID,lastBatchID,time_assigne
 
     test = time.time()
     regions_list = regions_process.stdout.read().splitlines()
-    print("read  time = ",(time.time() - test)*1000)
+    #print("read  time = ",(time.time() - test)*1000)
     total_coords = [regions_list[x:x+RECORDS_PER_SAMPLE] for x in range(0, len(regions_list), RECORDS_PER_SAMPLE)]
-    print("read and split data time = ",(time.time() - test)*1000)
-    print(total_coords)
+    #print("read and split data time = ",(time.time() - test)*1000)
+    #print(total_coords)
 
     print("length = ",len(total_coords) )
     finalData = len(total_coords) - 1
@@ -102,25 +102,25 @@ def submitQueryGTF(regions_process, requestID, regionID,lastBatchID,time_assigne
         if((time.time() - timeStart)*1000 > time_assigned_second_split):
             remainingCoords = total_coords[idx:]
             batchID = regionID+"_"+str(idx)
-            print("remaining Coords length ",len(remainingCoords))
-            print("remaining Coords  ",(remainingCoords))
+            #print("remaining Coords length ",len(remainingCoords))
+            #print("remaining Coords  ",(remainingCoords))
             tot_size = get_size(remainingCoords)
             kwargs = {'TopicArn': QUERY_VCF_SUBMIT_SNS_TOPIC_ARN,}
             if(tot_size < PAYLOAD_SIZE): #remaining coords could still be too big for SNS to handle
                 #call itself with remaining data
                 kwargs['Message'] = json.dumps({'coords' : remainingCoords,'requestID' : requestID, 'batchID': batchID,'lastBatchID': lastBatchID})
-                print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
+                #print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
                 response = sns.publish(**kwargs)
-                print('Received Response: {}'.format(json.dumps(response)))
+                #print('Received Response: {}'.format(json.dumps(response)))
                 break
             else: # Since coords are generally similar size because its made of chr, loc, ref, alt - we know 10batches of 700 records can be handled by SNS
                 for i in range(0, len(remainingCoords), BATCH_CHUNK_SIZE):
                     newRemainingCoords = remainingCoords[i:i+BATCH_CHUNK_SIZE]
                     newBatchID = batchID+"_sns"+str(i)
                     kwargs['Message'] = json.dumps({'coords' : newRemainingCoords,'requestID' : requestID, 'batchID': newBatchID,'lastBatchID': lastBatchID})
-                    print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
+                    #print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
                     response = sns.publish(**kwargs)
-                    print('Received Response: {}'.format(json.dumps(response)))
+                    #print('Received Response: {}'.format(json.dumps(response)))
                 break
 
         else:
@@ -146,16 +146,16 @@ def submitQueryGTF(regions_process, requestID, regionID,lastBatchID,time_assigne
                     'batchID':batchID,
                     'lastBatchID': 0
                 })
-            print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
+            #print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
             response = sns.publish(**kwargs)
-            print('Received Response: {}'.format(json.dumps(response)))
+            #print('Received Response: {}'.format(json.dumps(response)))
         #return(batchID)
 
 def lambda_handler(event, context):
     print('Event Received: {}'.format(json.dumps(event)))
     time_assigned = (context.get_remaining_time_in_millis()-MILLISECONDS_BEFORE_SPLIT)
     time_assigned_second_split = (context.get_remaining_time_in_millis()-MILLISECONDS_BEFORE_SECOND_SPLIT)
-    print("time assigned",time_assigned)
+    #print("time assigned",time_assigned)
     timeStart = time.time()
     event_body = event.get('body')
     if not event_body:
@@ -175,15 +175,15 @@ def lambda_handler(event, context):
         if( (time.time() - timeStart)*1000 > time_assigned):
             newRegions = vcf_regions[index:]
             batchID = ''
-            print("New Regions ",newRegions)
+            #print("New Regions ",newRegions)
             #publish Sns for itself!
             kwargs = {
                 'TopicArn': QUERY_VCF_EXTENDED_SNS_TOPIC_ARN,
             }
             kwargs['Message'] = json.dumps({'regions' : newRegions,'requestID' : requestID, 'location': location})
-            print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
+            #print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
             response = sns.publish(**kwargs)
-            print('Received Response: {}'.format(json.dumps(response)))
+            #print('Received Response: {}'.format(json.dumps(response)))
             break
         else:
             chrom, start_str = region.split(':')

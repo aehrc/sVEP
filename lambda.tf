@@ -54,6 +54,7 @@ resource "aws_lambda_permission" "SNSLambdapluginConsequence" {
   source_arn = "${aws_sns_topic.pluginConsequence.arn}"
 }
 
+
 #
 # pluginUpdownstream Lambda Function
 #

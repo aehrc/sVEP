@@ -104,7 +104,7 @@ module "lambda-queryGTF" {
   environment ={
     variables = {
       SVEP_TEMP = "${aws_s3_bucket.svep-temp.bucket}"
-      REFERENCE_GENOME = "s3://svep/sorted_filtered_Homo_sapiens.GRCh38.98.chr.gtf.gz"
+      REFERENCE_GENOME = "sorted_filtered_Homo_sapiens.GRCh38.99.chr.gtf.gz"
       PLUGIN_CONSEQUENCE_SNS_TOPIC_ARN = "${aws_sns_topic.pluginConsequence.arn}"
       PLUGIN_UPDOWNSTREAM_SNS_TOPIC_ARN = "${aws_sns_topic.pluginUpdownstream.arn}"
       QUERY_GTF_SNS_TOPIC_ARN = "${aws_sns_topic.queryGTF.arn}"
@@ -138,6 +138,7 @@ module "lambda-pluginConsequence" {
       SVEP_TEMP = "${aws_s3_bucket.svep-temp.bucket}"
       SVEP_REGIONS = "${aws_s3_bucket.svep-regions.bucket}"
       REFERENCE_LOCATION = "s3://svep/"
+      SPLICE_REFERENCE = "sorted_splice_GRCh38.99.gtf.gz"
     }
   }
 }
@@ -161,7 +162,7 @@ module "lambda-pluginUpdownstream" {
   environment ={
     variables = {
       SVEP_TEMP = "${aws_s3_bucket.svep-temp.bucket}"
-      REFERENCE_GENOME = "s3://svep/transcripts_Homo_sapiens.GRCh38.98.chr.gtf.gz"
+      REFERENCE_GENOME = "transcripts_Homo_sapiens.GRCh38.99.chr.gtf.gz"
       SVEP_REGIONS = "${aws_s3_bucket.svep-regions.bucket}"
       CONCAT_SNS_TOPIC_ARN = "${aws_sns_topic.concat.arn}"
     }
@@ -175,7 +176,7 @@ module "lambda-concat" {
   source = "github.com/claranet/terraform-aws-lambda"
 
   function_name = "concat"
-  description = "concatenates all the temp files from SVEP_REGIONS bucket and push to SVEP_RESULTS"
+  description = "validates all processing is done and triggers createPages."
   handler = "lambda_function.lambda_handler"
   runtime = "python3.6"
   memory_size = 2048
@@ -190,7 +191,6 @@ module "lambda-concat" {
     variables = {
       SVEP_TEMP = "${aws_s3_bucket.svep-temp.bucket}"
       SVEP_REGIONS = "${aws_s3_bucket.svep-regions.bucket}"
-      SVEP_RESULTS = "${aws_s3_bucket.svep-results.bucket}"
       CONCAT_SNS_TOPIC_ARN = "${aws_sns_topic.concat.arn}"
       CREATEPAGES_SNS_TOPIC_ARN = "${aws_sns_topic.createPages.arn}"
     }
@@ -204,7 +204,7 @@ module "lambda-createPages" {
   source = "github.com/claranet/terraform-aws-lambda"
 
   function_name = "createPages"
-  description = "concatenates individual page received from concat lambda"
+  description = "concatenates individual page with 700 entries, received from concat lambda"
   handler = "lambda_function.lambda_handler"
   runtime = "python3.6"
   memory_size = 2048
@@ -218,8 +218,9 @@ module "lambda-createPages" {
   environment ={
     variables = {
       SVEP_REGIONS = "${aws_s3_bucket.svep-regions.bucket}"
+      SVEP_RESULTS = "${aws_s3_bucket.svep-results.bucket}"
       CONCATPAGES_SNS_TOPIC_ARN = "${aws_sns_topic.concatPages.arn}"
-
+      CREATEPAGES_SNS_TOPIC_ARN = "${aws_sns_topic.createPages.arn}"
     }
   }
 }

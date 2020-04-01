@@ -27,8 +27,9 @@ def queryUpdownstream(chrom, pos, alt, transcripts):
         loc = str(chrom)+":"+str(up)+"-"+str(down)
         #print(loc)
         #print("position is ", pos)
+        localFile = '/tmp/'+REFERENCE_GENOME
 
-        args = ['tabix','/tmp/transcripts_Homo_sapiens.GRCh38.98.chr.gtf.gz',loc]
+        args = ['tabix',localFile,loc]
         query_process = subprocess.Popen(args, stdout=subprocess.PIPE,stderr=subprocess.PIPE, cwd='/tmp',encoding='ascii')
         mainData = query_process.stdout.read().rstrip('\n').split('\n')
         line=""
@@ -60,7 +61,8 @@ def queryUpdownstream(chrom, pos, alt, transcripts):
                 else:
                     line= "24"+"\t"+"."+"\t"+chrom+":"+str(pos)+"-"+str(pos)+"\t"+alt+"\t"+"upstream_gene_variant"+"\t"+info["gene_name"].strip('"')+"\t"+info["gene_id"].strip('"')+"\t"+metadata[2]+"\t"+info["transcript_id"].strip('"')+"."+info["transcript_version"].strip('"')+"\t"+info["transcript_biotype"].rstrip(';').strip('"')+"\t"+'-'+"\t"+"-"+"\t"+"-"+"\t"+metadata[6]
             else:
-                line= "Couldn't classify - need to check -" + info["transcript_id"].strip('"')
+                #line= "Couldn't classify - need to check -" + info["transcript_id"].strip('"')
+                print("Couldn't classify - need to check -" + info["transcript_id"].strip('"'))
 
             results.append(line)
         #print(results)
@@ -83,9 +85,10 @@ def lambda_handler(event, context):
     lastBatchID = message['lastBatchID']
     writeData = []
     s3 = boto3.resource('s3')
-    
+
     BUCKET_NAME = 'svep'
-    keys = ['transcripts_Homo_sapiens.GRCh38.98.chr.gtf.gz', 'transcripts_Homo_sapiens.GRCh38.98.chr.gtf.gz.tbi']
+    key2 = REFERENCE_GENOME+'.tbi'
+    keys = [REFERENCE_GENOME, key2]
     for KEY in keys:
         local_file_name = '/tmp/'+KEY
         s3.Bucket(BUCKET_NAME).download_file(KEY, local_file_name)
@@ -99,7 +102,7 @@ def lambda_handler(event, context):
         results = []
         for dat in data:
             if(len(dat) == 0):
-                writeData.append(str(38)+"\t"+"."+"\t"+chrom+":"+str(pos)+"-"+str(pos)+"\t"+alt+"\t"+"intergenic_gene_variant"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-")
+                writeData.append(str(38)+"\t"+"."+"\t"+chrom+":"+str(pos)+"-"+str(pos)+"\t"+alt+"\t"+"intergenic_variant"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-"+"\t"+"-")
                 transcripts = []
                 continue
             transcripts.append(re.search('transcript_id\s\\\"(\w+)\\\"\;', dat, re.IGNORECASE).group(1))
@@ -124,4 +127,4 @@ def lambda_handler(event, context):
         kwargs['Message'] = json.dumps({'APIid' : APIid,'lastBatchID' : batchID})
         print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
         response = sns.publish(**kwargs)
-        print('Received Response: {}'.format(json.dumps(response)))
+        #print('Received Response: {}'.format(json.dumps(response)))

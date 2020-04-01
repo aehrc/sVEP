@@ -86,7 +86,8 @@ def overlap_feature(all_coords,APIid,batchID,lastBatchID,time_assigned,startTime
         loc = chr+":"+pos+"-"+pos
         #changes = all_changes[idx]
         data={}
-        args = ['tabix','/tmp/sorted_filtered_Homo_sapiens.GRCh38.98.chr.gtf.gz',loc]
+        localFile = '/tmp/'+REFERENCE_GENOME
+        args = ['tabix',localFile,loc]
         query_process = subprocess.Popen(args, stdout=subprocess.PIPE,stderr=subprocess.PIPE, cwd='/tmp',encoding='ascii')
         mainData = query_process.stdout.read().rstrip('\n').split('\n')
         data = {
@@ -104,7 +105,7 @@ def overlap_feature(all_coords,APIid,batchID,lastBatchID,time_assigned,startTime
                 counter += 1
                 uniqueBatchID = batchID +"_"+str(counter)
                 print(uniqueBatchID)
-                print("records processed ", idx)
+                #print("records processed ", idx)
                 for topic in topics:
                     tempFileName = APIid+"_"+uniqueBatchID+"_"+topic
                     sendDatatoPlugins(topic,results,APIid,uniqueBatchID,tempFileName,0)
@@ -120,7 +121,7 @@ def overlap_feature(all_coords,APIid,batchID,lastBatchID,time_assigned,startTime
             counter += 1
             uniqueBatchID = batchID +"_"+str(counter)
             print(uniqueBatchID)
-            print("records processed ", idx)
+            #print("records processed ", idx)
             for topic in topics:
                 tempFileName = APIid+"_"+uniqueBatchID+"_"+topic
                 sendDatatoPlugins(topic,results,APIid,uniqueBatchID,tempFileName,0)
@@ -173,7 +174,8 @@ def lambda_handler(event, context):
     #    originalBatchID = message['originalBatchID']
 
     BUCKET_NAME = 'svep'
-    keys = ['sorted_filtered_Homo_sapiens.GRCh38.98.chr.gtf.gz', 'sorted_filtered_Homo_sapiens.GRCh38.98.chr.gtf.gz.tbi']
+    key2 = REFERENCE_GENOME+'.tbi'
+    keys = [REFERENCE_GENOME, key2]
     moveReferenceDataToTMP(BUCKET_NAME,keys)
     startTime = time.time()
     overlap_feature(coords,APIid,batchID,lastBatchID,time_assigned,startTime)
