@@ -153,6 +153,18 @@ def submitQueryGTF(regions_process, requestID, regionID,lastBatchID,time_assigne
             response = sns.publish(**kwargs)
             #print('Received Response: {}'.format(json.dumps(response)))
         #return(batchID)
+    '''if((lastBatchID == 1) and (len(total_coords) == 0)):
+        print("last Batch")
+        batchID = regionID+"_1"
+        print(batchID)
+        createTempFile(requestID,batchID)
+        kwargs['Message'] = json.dumps({
+            'coords':"",
+            #'changes':total_changes[idx],
+            'APIid':requestID,
+            'batchID':batchID,
+            'lastBatchID' : lastBatchID
+        })'''
 
 def lambda_handler(event, context):
     print('Event Received: {}'.format(json.dumps(event)))

@@ -5,9 +5,10 @@ import subprocess
 import time
 import sys
 import boto3
-import codecs
-from smart_open_reduced import BufferedOutputBase
+#from smart_open_reduced import BufferedOutputBase
+import s3fs
 #global vars
+fs = s3fs.S3FileSystem(anon=False)
 s3 = boto3.client('s3')
 s3Obj = boto3.resource('s3')
 dynamodb = boto3.client('dynamodb')
@@ -24,44 +25,45 @@ def upload_from_file_handle(bucket, key, file_handle):
         for line in file_handle:
             fout.write(line)
 
-def publishResult(APIid, lastFile, pageNum,context):
-    pre = APIid+"_page"
+
+def publishResult(APIid,allKeys, lastFile, pageNum,prefix,context):
+    startTime = time.time()
+    #pre = APIid+"_page"
     filename = APIid+"_results.tsv"
+    filePath = "s3://"+SVEP_RESULTS+"/"+filename
     if(len(s3.list_objects_v2(Bucket=SVEP_REGIONS, Prefix=lastFile)['Contents']) == 1):
-        if(len(s3.list_objects_v2(Bucket=SVEP_REGIONS, Prefix=pre)['Contents']) == pageNum):
-            #bucket = s3Obj.Bucket(SVEP_REGIONS)
-            allFiles = s3.list_objects_v2(Bucket=SVEP_REGIONS, Prefix=pre)['Contents']
-            allKeys = [d['Key'] for d in allFiles]
+        if(len(s3.list_objects_v2(Bucket=SVEP_REGIONS, Prefix=prefix)['Contents']) == pageNum):
+            #allFiles = s3.list_objects_v2(Bucket=SVEP_REGIONS, Prefix=prefix)['Contents']
+            #allKeys = [d['Key'] for d in allFiles]
+            paths = [SVEP_REGIONS+"/"+d for d in allKeys]
+            #paths = "newtestconcat/"
+            fs.merge(path=filePath,filelist=paths)
+            #print(paths)
             content = []
-            num =0
-            for keys in allKeys:
-                obj = s3.get_object(Bucket=SVEP_REGIONS, Key=keys)
-                body = obj['Body'].read()
-                content.append(body)
-                num+=1
-            #    body = obj['Body']
-            #    for ln in codecs.getreader('utf-8')(body):
-	         #          content.append(ln)
-            ##for obj in bucket.objects.filter(Prefix=pre):
-            ##    num+=1
-            ##    body = obj.get()['Body'].read()
-                #body = obj.get()['Body']
-            ##    print("Time remaining in lambda = ",context.get_remaining_time_in_millis())
-            ##    print(num)
-            ##    if(context.get_remaining_time_in_millis() < 10000):
-            ##        break
-                #for ln in codecs.getreader('utf-8')(body):
-                #    content.append(ln)
-            ##    content.append(body)
+            #num =0
+            #for keys in allKeys:
+            #    obj = s3.get_object(Bucket=SVEP_REGIONS, Key=keys)
+            #    body = obj['Body'].read()
+            #    body = body +b"\n"
+            #    content.append(body)
+                #num+=1
+            #result_bucket = s3Obj.Bucket(SVEP_RESULTS)
+            #print(num)
+            print("time taken = ", (time.time() - startTime)*1000)
             #s3Obj.Object(SVEP_RESULTS, filename).put(Body=(b"\n".join(content)))
-            #s3Obj.Object(SVEP_RESULTS, filename).put(Body=content)
-            result_bucket = s3Obj.Bucket(SVEP_RESULTS)
-            print(num)
-            upload_from_file_handle(result_bucket, filename, content)
+            #s3Obj.Bucket(SVEP_RESULTS).put_object(Key=filename, Body=(b"\n".join(content)))
+            #threading.Thread(target = upload_from_file_handle, args=(result_bucket, filename, content,)).start()
+            #upload_from_file_handle(result_bucket, filename, content)
             print(" Done concatenating")
         else:
             print("createPages failed to create one of the page")
-            sys.exit()
+            kwargs = {
+                'TopicArn': CONCATPAGES_SNS_TOPIC_ARN,
+            }
+            kwargs['Message'] = json.dumps({'APIid' : APIid,'lastFile' : lastFile,'pageNum' : pageNum})
+            print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
+            response = sns.publish(**kwargs)
+            #print('Received Response: {}'.format(json.dumps(response)))
     else:
         print("Still waiting for the last page to be created")
         kwargs = {
@@ -70,7 +72,7 @@ def publishResult(APIid, lastFile, pageNum,context):
         kwargs['Message'] = json.dumps({'APIid' : APIid,'lastFile' : lastFile,'pageNum' : pageNum})
         print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
         response = sns.publish(**kwargs)
-        print('Received Response: {}'.format(json.dumps(response)))
+        #print('Received Response: {}'.format(json.dumps(response)))
 
 
 def lambda_handler(event, context):
@@ -80,8 +82,10 @@ def lambda_handler(event, context):
     #######################################
     message = json.loads(event['Records'][0]['Sns']['Message'])
     APIid = message['APIid']
+    allKeys = message['allKeys']
     lastFile = message['lastFile']
     pageNum = message['pageNum']
+    prefix = message['prefix']
 
     #time.sleep(8)
-    publishResult(APIid,lastFile, pageNum,context)
+    publishResult(APIid,allKeys,lastFile, pageNum,prefix,context)

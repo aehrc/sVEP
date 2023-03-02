@@ -5,7 +5,7 @@ import subprocess
 import time
 import sys
 import boto3
-from smart_open_reduced import BufferedOutputBase
+#from smart_open_reduced import BufferedOutputBase
 #global vars
 s3 = boto3.client('s3')
 s3Obj = boto3.resource('s3')

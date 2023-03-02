@@ -29,7 +29,7 @@ def publishResult(APIid,pageKeys, pageNum,prefix,dontAppend, lastPage):
             body = obj['Body'].read()
             #body = body +b"\n"
             content.append(body)
-            s3Obj.Object(Bucket=SVEP_REGIONS, Key=pageKey).delete()
+            #s3Obj.Object(Bucket=SVEP_REGIONS, Key=pageKey).delete()
         #todo - cleanup - delete the obj once the content is read and stored in memory
         s3Obj.Object(SVEP_REGIONS, filename).put(Body=(b"\n".join(content)))#add \n if necessary
     #print(" Done concatenating")
@@ -39,7 +39,7 @@ def publishResult(APIid,pageKeys, pageNum,prefix,dontAppend, lastPage):
         if( bucketLen != pageNum):
             print("calling itself again to make sure all files are done.")
             kwargs = {'TopicArn': CREATEPAGES_SNS_TOPIC_ARN,}
-            kwargs['Message'] = json.dumps({'APIid':APIid,'pageKeys' : pageKeys,'pageNum' : pageNum,'prefix' :prefix,'dontAppend':1,'lastPage': 1})
+            kwargs['Message'] = json.dumps({'APIid':APIid,'pageKeys' : pageKeys,'pageNum' : pageNum,'prefix' :prefix,'dontAppend' : 1,'lastPage': 1})
             print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
             response = sns.publish(**kwargs)
             #print('Received Response: {}'.format(json.dumps(response)))

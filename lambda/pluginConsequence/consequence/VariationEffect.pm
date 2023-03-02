@@ -455,7 +455,7 @@ sub within_mature_miRNA {
   $bvf  ||= $bvfo->base_variation_feature;
   $feat ||= $bvfo->feature;
 
-  return 0 unless ( ($feat->{biotype} eq 'miRNA') and within_transcript(@_) );
+  return 1 if ( ($feat->{biotype} eq 'miRNA') and within_transcript(@_) and $feat->{within_mirna} == 1  );
 
   #foreach my $attribute(@{ $feat->get_all_Attributes('miRNA') }) {
 
@@ -693,13 +693,22 @@ sub _get_peptide_alleles {
     my $ref_allele = $feat->{'ref_allele'};
     my $alt_allele = $feat->{'alt_allele'};
     my $var_loc =  $feat->{'position'} - $feat->{'cdna_coding_start'};
-    if($ref_seq =~"TGA|TAA|TAG"){#This is for stop retained variant where you want to check the original ref for stop
+    if($ref_seq =~"^TGA\$|^TAA\$|^TAG\$"){#This is for stop retained variant where you want to check the original ref for stop
+      #print("\nSTOP REFFFF - $ref_seq\n");
       $feat->{stop_ref} = $ref_seq;
+      $feat->{stop_alt} = $ref_seq;
+      substr($feat->{stop_alt}, $var_loc, length $alt_allele) = $alt_allele;
     }
-    if(substr($ref_seq, $var_loc, length $ref_allele) =~ $ref_allele || $alt_allele eq "-"){
-      substr($alt_seq, $var_loc, length $alt_allele) = $alt_allele
+    if(substr($ref_seq, $var_loc, length $ref_allele) =~ $ref_allele ){
+      substr($alt_seq, $var_loc, length $alt_allele) = $alt_allele;
     }elsif($ref_allele eq "-"){
       substr($alt_seq, $var_loc, 0) = $alt_allele;
+    }elsif(substr($ref_seq, $var_loc, length $ref_allele) ne $ref_allele || $alt_allele eq "-"){
+      $feat->{warning} = "REF doesn't match GRCh38 reference at given position";
+      substr($ref_seq, $var_loc, length $ref_allele) = $ref_allele;
+      substr($alt_seq, $var_loc, length $alt_allele) = $alt_allele;
+    }elsif($alt_allele eq "-"){
+      substr($alt_seq, $var_loc, length $alt_allele) = $alt_allele;
     }else{
       $feat->{warning} = "REF doesn't match GRCh38 reference at given position";
       substr($ref_seq, $var_loc, length $ref_allele) = $ref_allele;
@@ -717,6 +726,9 @@ sub _get_peptide_alleles {
     for (my $i = $frame; $i <= $var_loc; $i+= 3) {
        $ref_pep_allele = substr($ref_seq, $i, 3);
        $alt_pep_allele = substr($alt_seq, $i, 3);
+    }
+    if($ref_pep_allele =~"^TGA\$|^TAA\$|^TAG\$" && $alt_pep_allele =~"-"){
+      $alt_pep_allele = $ref_pep_allele;
     }
     if(length $ref_pep_allele != 3 && length $alt_pep_allele != 3){
       $feat->{warning} = "Codon is out of CDS range.";
@@ -1193,6 +1205,7 @@ sub stop_gained {
 
 sub stop_lost {
     my ($bvfoa, $feat, $bvfo, $bvf) = @_;
+    return 0 if stop_retained(@_);
 
     # use cache for this method as it gets called a lot
     my $cache = $bvfoa->{_predicate_cache} ||= {};
@@ -1267,24 +1280,16 @@ sub stop_retained {
         my $refaa = $feat->{refaa};
 
         if(defined($alt_pep) && $alt_pep ne '') {
-            return 0 unless $altaa =~/^\*/;
+            #return 0 if((length($feat->{stop_ref})) and $altaa =~/^\*/  );
 
-            ## handle inframe insertion of a stop just before the stop (no ref peptide)
-            if(
-              $bvfoa->isa('consequence::TranscriptVariationAllele') &&
-              $bvfo->_peptide &&
-              $bvfo->translation_start() > length($bvfo->_peptide)
-            ) {
-              $cache->{stop_retained} = 1;
-            }
-            else {
                 return 0 unless $ref_pep;
 
                 $cache->{stop_retained} = ( $altaa =~ /^\*/ && $refaa =~ /^\*/ );
-                if($feat->{stop_ref} =~ "TGA|TAA|TAG"){
-                  $cache->{stop_retained} = ( $altaa =~ /^\*/ && $feat->{stop_ref} =~ "TGA|TAA|TAG" )
+                if(length $feat->{stop_ref} && $feat->{stop_ref} =~ "TGA|TAA|TAG"){
+                  my $alternate_aa = consequence::CodonTable->translate( $feat->{stop_alt}, 1,0);
+                  $cache->{stop_retained} = ( $alternate_aa =~ /^\*/ && $feat->{stop_ref} =~ "TGA|TAA|TAG" )
                 }
-            }
+
         }
         else {
             $cache->{stop_retained} = ($pre->{increase_length} || $pre->{decrease_length}) && _overlaps_stop_codon(@_) && !_ins_del_stop_altered(@_);

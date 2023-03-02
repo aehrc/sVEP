@@ -139,6 +139,7 @@ module "lambda-pluginConsequence" {
       SVEP_REGIONS = "${aws_s3_bucket.svep-regions.bucket}"
       REFERENCE_LOCATION = "s3://svep/"
       SPLICE_REFERENCE = "sorted_splice_GRCh38.99.gtf.gz"
+      MIRNA_REFERENCE = "sorted_filtered_mirna.gff3.gz" 
     }
   }
 }
