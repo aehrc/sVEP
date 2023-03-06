@@ -11,7 +11,7 @@ module "lambda-queryVCF" {
   function_name = "queryVCF"
   description = "Invokes infoSplitter for each dataset and returns result"
   handler = "lambda_function.lambda_handler"
-  runtime = "python3.6"
+  runtime = "python3.9"
   memory_size = 2048
   timeout = 28
   policy = {
@@ -39,7 +39,7 @@ module "lambda-queryVCFExtended" {
   function_name = "queryVCFExtended"
   description = "Invokes infoSplitter for each dataset and returns result"
   handler = "lambda_function.lambda_handler"
-  runtime = "python3.6"
+  runtime = "python3.9"
   memory_size = 2048
   timeout = 28
   policy = {
@@ -67,7 +67,7 @@ module "lambda-queryVCFsubmit" {
   function_name = "queryVCFsubmit"
   description = "This lambda will be called if there are too many batchids to be processed within"
   handler = "lambda_function.lambda_handler"
-  runtime = "python3.6"
+  runtime = "python3.9"
   memory_size = 2048
   timeout = 28
   policy = {
@@ -93,7 +93,7 @@ module "lambda-queryGTF" {
   function_name = "queryGTF"
   description = "Queries GTF for a specified VCF regions."
   handler = "lambda_function.lambda_handler"
-  runtime = "python3.6"
+  runtime = "python3.9"
   memory_size = 2048
   timeout = 24
   policy = {
@@ -152,7 +152,7 @@ module "lambda-pluginUpdownstream" {
   function_name = "pluginUpdownstream"
   description = "Write upstream and downstream gene variant to temp bucket."
   handler = "lambda_function.lambda_handler"
-  runtime = "python3.6"
+  runtime = "python3.9"
   memory_size = 2048
   timeout = 24
   policy = {
@@ -179,7 +179,7 @@ module "lambda-concat" {
   function_name = "concat"
   description = "validates all processing is done and triggers createPages."
   handler = "lambda_function.lambda_handler"
-  runtime = "python3.6"
+  runtime = "python3.9"
   memory_size = 2048
   timeout = 28
   policy = {
@@ -207,7 +207,7 @@ module "lambda-createPages" {
   function_name = "createPages"
   description = "concatenates individual page with 700 entries, received from concat lambda"
   handler = "lambda_function.lambda_handler"
-  runtime = "python3.6"
+  runtime = "python3.9"
   memory_size = 2048
   timeout = 28
   policy = {
@@ -235,7 +235,7 @@ module "lambda-concatPages" {
   function_name = "concatPages"
   description = "concatenates all the page files created by createPages lambda."
   handler = "lambda_function.lambda_handler"
-  runtime = "python3.6"
+  runtime = "python3.9"
   memory_size = 2048
   timeout = 28
   policy = {
