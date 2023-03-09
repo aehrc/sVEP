@@ -167,7 +167,7 @@ resource "aws_api_gateway_deployment" "VPApi" {
   rest_api_id = aws_api_gateway_rest_api.VPApi.id
   stage_name  = "dev"
   # taint deployment if any api resources change
-  stage_description = md5(join("", list(
+  stage_description = md5(join("", [
     md5(file("${path.module}/api.tf")),
     aws_api_gateway_method.submit-options.id,
     aws_api_gateway_integration.submit-options.id,
@@ -181,5 +181,5 @@ resource "aws_api_gateway_deployment" "VPApi" {
     aws_api_gateway_integration.submit-post.id,
     aws_api_gateway_integration_response.submit-post.id,
     aws_api_gateway_method_response.submit-post.id
-  )))
+  ]))
 }
