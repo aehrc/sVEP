@@ -22,9 +22,9 @@ data "aws_iam_policy_document" "lambda-queryVCF" {
       "SNS:Publish",
     ]
     resources = [
-      "${aws_sns_topic.queryGTF.arn}",
-      "${aws_sns_topic.queryVCFExtended.arn}",
-      "${aws_sns_topic.queryVCFsubmit.arn}",
+      aws_sns_topic.queryGTF.arn,
+      aws_sns_topic.queryVCFExtended.arn,
+      aws_sns_topic.queryVCFsubmit.arn,
     ]
   }
   statement {
@@ -46,9 +46,9 @@ data "aws_iam_policy_document" "lambda-queryVCFExtended" {
       "SNS:Publish",
     ]
     resources = [
-      "${aws_sns_topic.queryGTF.arn}",
-      "${aws_sns_topic.queryVCFExtended.arn}",
-      "${aws_sns_topic.queryVCFsubmit.arn}",
+      aws_sns_topic.queryGTF.arn,
+      aws_sns_topic.queryVCFExtended.arn,
+      aws_sns_topic.queryVCFsubmit.arn,
     ]
   }
   statement {
@@ -70,7 +70,7 @@ data "aws_iam_policy_document" "lambda-queryVCFsubmit" {
       "SNS:Publish",
     ]
     resources = [
-      "${aws_sns_topic.queryGTF.arn}",
+      aws_sns_topic.queryGTF.arn,
     ]
   }
   statement {
@@ -93,9 +93,9 @@ data "aws_iam_policy_document" "lambda-queryGTF" {
       "SNS:Publish",
     ]
     resources = [
-      "${aws_sns_topic.pluginConsequence.arn}",
-      "${aws_sns_topic.pluginUpdownstream.arn}",
-      "${aws_sns_topic.queryGTF.arn}",
+      aws_sns_topic.pluginConsequence.arn,
+      aws_sns_topic.pluginUpdownstream.arn,
+      aws_sns_topic.queryGTF.arn,
     ]
   }
   statement {
@@ -146,7 +146,7 @@ data "aws_iam_policy_document" "lambda-pluginUpdownstream" {
       "SNS:Publish",
     ]
     resources = [
-      "${aws_sns_topic.concat.arn}",
+      aws_sns_topic.concat.arn,
     ]
   }
 
@@ -169,8 +169,8 @@ data "aws_iam_policy_document" "lambda-concat" {
       "SNS:Publish",
     ]
     resources = [
-      "${aws_sns_topic.concat.arn}",
-      "${aws_sns_topic.createPages.arn}",
+      aws_sns_topic.concat.arn,
+      aws_sns_topic.createPages.arn,
     ]
   }
 }
@@ -193,9 +193,9 @@ data "aws_iam_policy_document" "lambda-createPages" {
       "SNS:Publish",
     ]
     resources = [
-      "${aws_sns_topic.concat.arn}",
-      "${aws_sns_topic.concatPages.arn}",
-      "${aws_sns_topic.createPages.arn}",
+      aws_sns_topic.concat.arn,
+      aws_sns_topic.concatPages.arn,
+      aws_sns_topic.createPages.arn,
     ]
   }
 }
@@ -218,7 +218,7 @@ data "aws_iam_policy_document" "lambda-concatPages" {
       "SNS:Publish",
     ]
     resources = [
-      "${aws_sns_topic.concatPages.arn}",
+      aws_sns_topic.concatPages.arn,
     ]
   }
 }

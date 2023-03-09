@@ -4,7 +4,7 @@
 resource "aws_lambda_permission" "APIqueryVCF" {
   statement_id = "AllowqueryVCFInvoke"
   action = "lambda:InvokeFunction"
-  function_name = "${module.lambda-queryVCF.function_name}"
+  function_name = module.lambda-queryVCF.function_name
   principal = "apigateway.amazonaws.com"
   source_arn = "${aws_api_gateway_rest_api.VPApi.execution_arn}/*/*/${aws_api_gateway_resource.submit.path_part}"
 }
@@ -15,9 +15,9 @@ resource "aws_lambda_permission" "APIqueryVCF" {
 resource "aws_lambda_permission" "SNSLambdaqueryVCFsubmit" {
   statement_id = "SNSLambdaqueryVCFsubmit"
   action = "lambda:InvokeFunction"
-  function_name = "${module.lambda-queryVCFsubmit.function_name}"
+  function_name = module.lambda-queryVCFsubmit.function_name
   principal = "sns.amazonaws.com"
-  source_arn = "${aws_sns_topic.queryVCFsubmit.arn}"
+  source_arn = aws_sns_topic.queryVCFsubmit.arn
 }
 
 #
@@ -26,9 +26,9 @@ resource "aws_lambda_permission" "SNSLambdaqueryVCFsubmit" {
 resource "aws_lambda_permission" "SNSLambdaqueryVCFExtended" {
   statement_id = "SNSLambdaqueryVCFExtended"
   action = "lambda:InvokeFunction"
-  function_name = "${module.lambda-queryVCFExtended.function_name}"
+  function_name = module.lambda-queryVCFExtended.function_name
   principal = "sns.amazonaws.com"
-  source_arn = "${aws_sns_topic.queryVCFExtended.arn}"
+  source_arn = aws_sns_topic.queryVCFExtended.arn
 }
 
 #
@@ -37,9 +37,9 @@ resource "aws_lambda_permission" "SNSLambdaqueryVCFExtended" {
 resource "aws_lambda_permission" "SNSLambdaqueryGTF" {
   statement_id = "SNSLambdaqueryGTF"
   action = "lambda:InvokeFunction"
-  function_name = "${module.lambda-queryGTF.function_name}"
+  function_name = module.lambda-queryGTF.function_name
   principal = "sns.amazonaws.com"
-  source_arn = "${aws_sns_topic.queryGTF.arn}"
+  source_arn = aws_sns_topic.queryGTF.arn
 }
 
 
@@ -49,9 +49,9 @@ resource "aws_lambda_permission" "SNSLambdaqueryGTF" {
 resource "aws_lambda_permission" "SNSLambdapluginConsequence" {
   statement_id = "SNSLambdapluginConsequence"
   action = "lambda:InvokeFunction"
-  function_name = "${module.lambda-pluginConsequence.function_name}"
+  function_name = module.lambda-pluginConsequence.function_name
   principal = "sns.amazonaws.com"
-  source_arn = "${aws_sns_topic.pluginConsequence.arn}"
+  source_arn = aws_sns_topic.pluginConsequence.arn
 }
 
 
@@ -61,9 +61,9 @@ resource "aws_lambda_permission" "SNSLambdapluginConsequence" {
 resource "aws_lambda_permission" "SNSLambdapluginUpdownstream" {
   statement_id = "SNSLambdapluginUpdownstream"
   action = "lambda:InvokeFunction"
-  function_name = "${module.lambda-pluginUpdownstream.function_name}"
+  function_name = module.lambda-pluginUpdownstream.function_name
   principal = "sns.amazonaws.com"
-  source_arn = "${aws_sns_topic.pluginUpdownstream.arn}"
+  source_arn = aws_sns_topic.pluginUpdownstream.arn
 }
 
 #
@@ -72,9 +72,9 @@ resource "aws_lambda_permission" "SNSLambdapluginUpdownstream" {
 resource "aws_lambda_permission" "SNSLambdaconcat" {
   statement_id = "SNSLambdaconcat"
   action = "lambda:InvokeFunction"
-  function_name = "${module.lambda-concat.function_name}"
+  function_name = module.lambda-concat.function_name
   principal = "sns.amazonaws.com"
-  source_arn = "${aws_sns_topic.concat.arn}"
+  source_arn = aws_sns_topic.concat.arn
 }
 
 #
@@ -83,9 +83,9 @@ resource "aws_lambda_permission" "SNSLambdaconcat" {
 resource "aws_lambda_permission" "SNSLambdacreatePages" {
   statement_id = "SNSLambdacreatePages"
   action = "lambda:InvokeFunction"
-  function_name = "${module.lambda-createPages.function_name}"
+  function_name = module.lambda-createPages.function_name
   principal = "sns.amazonaws.com"
-  source_arn = "${aws_sns_topic.createPages.arn}"
+  source_arn = aws_sns_topic.createPages.arn
 }
 #
 # concatPages Lambda Function
@@ -93,7 +93,7 @@ resource "aws_lambda_permission" "SNSLambdacreatePages" {
 resource "aws_lambda_permission" "SNSLambdaconcatPages" {
   statement_id = "SNSLambdaconcatPages"
   action = "lambda:InvokeFunction"
-  function_name = "${module.lambda-concatPages.function_name}"
+  function_name = module.lambda-concatPages.function_name
   principal = "sns.amazonaws.com"
-  source_arn = "${aws_sns_topic.concatPages.arn}"
+  source_arn = aws_sns_topic.concatPages.arn
 }

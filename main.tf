@@ -18,14 +18,14 @@ module "lambda-queryVCF" {
     json = data.aws_iam_policy_document.lambda-queryVCF.json
   }
   source_path = "${path.module}/lambda/queryVCF"
-  #tags = "${var.common-tags}"
+  #tags = var.common-tags
 
   environment ={
     variables = {
-      SVEP_TEMP = "${aws_s3_bucket.svep-temp.bucket}"
-      QUERY_GTF_SNS_TOPIC_ARN = "${aws_sns_topic.queryGTF.arn}"
-      QUERY_VCF_EXTENDED_SNS_TOPIC_ARN = "${aws_sns_topic.queryVCFExtended.arn}"
-      QUERY_VCF_SUBMIT_SNS_TOPIC_ARN = "${aws_sns_topic.queryVCFsubmit.arn}"
+      SVEP_TEMP = aws_s3_bucket.svep-temp.bucket
+      QUERY_GTF_SNS_TOPIC_ARN = aws_sns_topic.queryGTF.arn
+      QUERY_VCF_EXTENDED_SNS_TOPIC_ARN = aws_sns_topic.queryVCFExtended.arn
+      QUERY_VCF_SUBMIT_SNS_TOPIC_ARN = aws_sns_topic.queryVCFsubmit.arn
     }
   }
 }
@@ -46,14 +46,14 @@ module "lambda-queryVCFExtended" {
     json = data.aws_iam_policy_document.lambda-queryVCFExtended.json
   }
   source_path = "${path.module}/lambda/queryVCFExtended"
-  #tags = "${var.common-tags}"
+  #tags = var.common-tags
 
   environment ={
     variables = {
-      SVEP_TEMP = "${aws_s3_bucket.svep-temp.bucket}"
-      QUERY_GTF_SNS_TOPIC_ARN = "${aws_sns_topic.queryGTF.arn}"
-      QUERY_VCF_EXTENDED_SNS_TOPIC_ARN = "${aws_sns_topic.queryVCFExtended.arn}"
-      QUERY_VCF_SUBMIT_SNS_TOPIC_ARN = "${aws_sns_topic.queryVCFsubmit.arn}"
+      SVEP_TEMP = aws_s3_bucket.svep-temp.bucket
+      QUERY_GTF_SNS_TOPIC_ARN = aws_sns_topic.queryGTF.arn
+      QUERY_VCF_EXTENDED_SNS_TOPIC_ARN = aws_sns_topic.queryVCFExtended.arn
+      QUERY_VCF_SUBMIT_SNS_TOPIC_ARN = aws_sns_topic.queryVCFsubmit.arn
     }
   }
 }
@@ -74,13 +74,13 @@ module "lambda-queryVCFsubmit" {
     json = data.aws_iam_policy_document.lambda-queryVCFsubmit.json
   }
   source_path = "${path.module}/lambda/queryVCFsubmit"
-  #tags = "${var.common-tags}"
+  #tags = var.common-tags
 
   environment ={
     variables = {
-      SVEP_TEMP = "${aws_s3_bucket.svep-temp.bucket}"
-      QUERY_GTF_SNS_TOPIC_ARN = "${aws_sns_topic.queryGTF.arn}"
-      QUERY_VCF_SUBMIT_SNS_TOPIC_ARN = "${aws_sns_topic.queryVCFsubmit.arn}"
+      SVEP_TEMP = aws_s3_bucket.svep-temp.bucket
+      QUERY_GTF_SNS_TOPIC_ARN = aws_sns_topic.queryGTF.arn
+      QUERY_VCF_SUBMIT_SNS_TOPIC_ARN = aws_sns_topic.queryVCFsubmit.arn
     }
   }
 }
@@ -100,14 +100,14 @@ module "lambda-queryGTF" {
     json = data.aws_iam_policy_document.lambda-queryGTF.json
   }
   source_path = "${path.module}/lambda/queryGTF"
-  #tags = "${var.common-tags}"
+  #tags = var.common-tags
   environment ={
     variables = {
-      SVEP_TEMP = "${aws_s3_bucket.svep-temp.bucket}"
+      SVEP_TEMP = aws_s3_bucket.svep-temp.bucket
       REFERENCE_GENOME = "sorted_filtered_Homo_sapiens.GRCh38.99.chr.gtf.gz"
-      PLUGIN_CONSEQUENCE_SNS_TOPIC_ARN = "${aws_sns_topic.pluginConsequence.arn}"
-      PLUGIN_UPDOWNSTREAM_SNS_TOPIC_ARN = "${aws_sns_topic.pluginUpdownstream.arn}"
-      QUERY_GTF_SNS_TOPIC_ARN = "${aws_sns_topic.queryGTF.arn}"
+      PLUGIN_CONSEQUENCE_SNS_TOPIC_ARN = aws_sns_topic.pluginConsequence.arn
+      PLUGIN_UPDOWNSTREAM_SNS_TOPIC_ARN = aws_sns_topic.pluginUpdownstream.arn
+      QUERY_GTF_SNS_TOPIC_ARN = aws_sns_topic.queryGTF.arn
     }
   }
 }
@@ -128,15 +128,15 @@ module "lambda-pluginConsequence" {
     json = data.aws_iam_policy_document.lambda-pluginConsequence.json
   }
   source_path = "${path.module}/lambda/pluginConsequence"
-  #tags = "${var.common-tags}"
+  #tags = var.common-tags
   layers =[
     "arn:aws:lambda:ap-southeast-2:445285296882:layer:perl-5-30-runtime:5",
     "arn:aws:lambda:ap-southeast-2:132838717167:layer:serverlessrepo-lambda-layer-awscli:1"
   ]
   environment ={
     variables = {
-      SVEP_TEMP = "${aws_s3_bucket.svep-temp.bucket}"
-      SVEP_REGIONS = "${aws_s3_bucket.svep-regions.bucket}"
+      SVEP_TEMP = aws_s3_bucket.svep-temp.bucket
+      SVEP_REGIONS = aws_s3_bucket.svep-regions.bucket
       REFERENCE_LOCATION = "s3://svep/"
       SPLICE_REFERENCE = "sorted_splice_GRCh38.99.gtf.gz"
       MIRNA_REFERENCE = "sorted_filtered_mirna.gff3.gz" 
@@ -159,13 +159,13 @@ module "lambda-pluginUpdownstream" {
     json = data.aws_iam_policy_document.lambda-pluginUpdownstream.json
   }
   source_path = "${path.module}/lambda/pluginUpdownstream"
-  #tags = "${var.common-tags}"
+  #tags = var.common-tags
   environment ={
     variables = {
-      SVEP_TEMP = "${aws_s3_bucket.svep-temp.bucket}"
+      SVEP_TEMP = aws_s3_bucket.svep-temp.bucket
       REFERENCE_GENOME = "transcripts_Homo_sapiens.GRCh38.99.chr.gtf.gz"
-      SVEP_REGIONS = "${aws_s3_bucket.svep-regions.bucket}"
-      CONCAT_SNS_TOPIC_ARN = "${aws_sns_topic.concat.arn}"
+      SVEP_REGIONS = aws_s3_bucket.svep-regions.bucket
+      CONCAT_SNS_TOPIC_ARN = aws_sns_topic.concat.arn
     }
   }
 }
@@ -186,14 +186,14 @@ module "lambda-concat" {
     json = data.aws_iam_policy_document.lambda-concat.json
   }
   source_path = "${path.module}/lambda/concat"
-  #tags = "${var.common-tags}"
+  #tags = var.common-tags
 
   environment ={
     variables = {
-      SVEP_TEMP = "${aws_s3_bucket.svep-temp.bucket}"
-      SVEP_REGIONS = "${aws_s3_bucket.svep-regions.bucket}"
-      CONCAT_SNS_TOPIC_ARN = "${aws_sns_topic.concat.arn}"
-      CREATEPAGES_SNS_TOPIC_ARN = "${aws_sns_topic.createPages.arn}"
+      SVEP_TEMP = aws_s3_bucket.svep-temp.bucket
+      SVEP_REGIONS = aws_s3_bucket.svep-regions.bucket
+      CONCAT_SNS_TOPIC_ARN = aws_sns_topic.concat.arn
+      CREATEPAGES_SNS_TOPIC_ARN = aws_sns_topic.createPages.arn
     }
   }
 }
@@ -214,14 +214,14 @@ module "lambda-createPages" {
     json = data.aws_iam_policy_document.lambda-createPages.json
   }
   source_path = "${path.module}/lambda/createPages"
-  #tags = "${var.common-tags}"
+  #tags = var.common-tags
 
   environment ={
     variables = {
-      SVEP_REGIONS = "${aws_s3_bucket.svep-regions.bucket}"
-      SVEP_RESULTS = "${aws_s3_bucket.svep-results.bucket}"
-      CONCATPAGES_SNS_TOPIC_ARN = "${aws_sns_topic.concatPages.arn}"
-      CREATEPAGES_SNS_TOPIC_ARN = "${aws_sns_topic.createPages.arn}"
+      SVEP_REGIONS = aws_s3_bucket.svep-regions.bucket
+      SVEP_RESULTS = aws_s3_bucket.svep-results.bucket
+      CONCATPAGES_SNS_TOPIC_ARN = aws_sns_topic.concatPages.arn
+      CREATEPAGES_SNS_TOPIC_ARN = aws_sns_topic.createPages.arn
     }
   }
 }
@@ -242,13 +242,13 @@ module "lambda-concatPages" {
     json = data.aws_iam_policy_document.lambda-concatPages.json
   }
   source_path = "${path.module}/lambda/concatPages"
-  #tags = "${var.common-tags}"
+  #tags = var.common-tags
 
   environment ={
     variables = {
-      SVEP_REGIONS = "${aws_s3_bucket.svep-regions.bucket}"
-      SVEP_RESULTS = "${aws_s3_bucket.svep-results.bucket}"
-      CONCATPAGES_SNS_TOPIC_ARN = "${aws_sns_topic.concatPages.arn}"
+      SVEP_REGIONS = aws_s3_bucket.svep-regions.bucket
+      SVEP_RESULTS = aws_s3_bucket.svep-results.bucket
+      CONCATPAGES_SNS_TOPIC_ARN = aws_sns_topic.concatPages.arn
     }
   }
 }
