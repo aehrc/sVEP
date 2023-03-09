@@ -67,7 +67,7 @@ resource "aws_api_gateway_integration_response" "submit-options" {
     "application/json" = ""
   }
 
-  depends_on = ["aws_api_gateway_integration.submit-options"]
+  depends_on = [aws_api_gateway_integration.submit-options]
 }
 
 resource "aws_api_gateway_method" "submit-patch" {
@@ -112,7 +112,7 @@ resource "aws_api_gateway_integration_response" "submit-patch" {
     "application/json" = ""
   }
 
-  depends_on = ["aws_api_gateway_integration.submit-patch"]
+  depends_on = [aws_api_gateway_integration.submit-patch]
 }
 
 resource "aws_api_gateway_method" "submit-post" {
@@ -156,7 +156,7 @@ resource "aws_api_gateway_integration_response" "submit-post" {
     "application/json" = ""
   }
 
-  depends_on = ["aws_api_gateway_integration.submit-post"]
+  depends_on = [aws_api_gateway_integration.submit-post]
 }
 
 
