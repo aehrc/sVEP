@@ -6,7 +6,7 @@ locals {
 # queryVCF Lambda Function
 #
 module "lambda-queryVCF" {
-  source = "github.com/claranet/terraform-aws-lambda"
+  source = "github.com/bhosking/terraform-aws-lambda"
 
   function_name = "queryVCF"
   description = "Invokes infoSplitter for each dataset and returns result"
@@ -34,7 +34,7 @@ module "lambda-queryVCF" {
 # queryVCFExtended Lambda Function
 #
 module "lambda-queryVCFExtended" {
-  source = "github.com/claranet/terraform-aws-lambda"
+  source = "github.com/bhosking/terraform-aws-lambda"
 
   function_name = "queryVCFExtended"
   description = "Invokes infoSplitter for each dataset and returns result"
@@ -62,7 +62,7 @@ module "lambda-queryVCFExtended" {
 # queryVCFsubmit Lambda Function
 #
 module "lambda-queryVCFsubmit" {
-  source = "github.com/claranet/terraform-aws-lambda"
+  source = "github.com/bhosking/terraform-aws-lambda"
 
   function_name = "queryVCFsubmit"
   description = "This lambda will be called if there are too many batchids to be processed within"
@@ -89,7 +89,7 @@ module "lambda-queryVCFsubmit" {
 # queryGTF Lambda Function
 #
 module "lambda-queryGTF" {
-  source = "github.com/claranet/terraform-aws-lambda"
+  source = "github.com/bhosking/terraform-aws-lambda"
   function_name = "queryGTF"
   description = "Queries GTF for a specified VCF regions."
   handler = "lambda_function.lambda_handler"
@@ -117,7 +117,7 @@ module "lambda-queryGTF" {
 # pluginConsequence Lambda Function
 #
 module "lambda-pluginConsequence" {
-  source = "github.com/claranet/terraform-aws-lambda"
+  source = "github.com/bhosking/terraform-aws-lambda"
   function_name = "pluginConsequence"
   description = "Queries VCF for a specified variant."
   handler = "VEP.handle"
@@ -148,7 +148,7 @@ module "lambda-pluginConsequence" {
 # pluginUpdownstream Lambda Function
 #
 module "lambda-pluginUpdownstream" {
-  source = "github.com/claranet/terraform-aws-lambda"
+  source = "github.com/bhosking/terraform-aws-lambda"
   function_name = "pluginUpdownstream"
   description = "Write upstream and downstream gene variant to temp bucket."
   handler = "lambda_function.lambda_handler"
@@ -174,7 +174,7 @@ module "lambda-pluginUpdownstream" {
 # concat Lambda Function
 #
 module "lambda-concat" {
-  source = "github.com/claranet/terraform-aws-lambda"
+  source = "github.com/bhosking/terraform-aws-lambda"
 
   function_name = "concat"
   description = "validates all processing is done and triggers createPages."
@@ -202,7 +202,7 @@ module "lambda-concat" {
 # createPages Lambda Function
 #
 module "lambda-createPages" {
-  source = "github.com/claranet/terraform-aws-lambda"
+  source = "github.com/bhosking/terraform-aws-lambda"
 
   function_name = "createPages"
   description = "concatenates individual page with 700 entries, received from concat lambda"
@@ -230,7 +230,7 @@ module "lambda-createPages" {
 # concatPages Lambda Function
 #
 module "lambda-concatPages" {
-  source = "github.com/claranet/terraform-aws-lambda"
+  source = "github.com/bhosking/terraform-aws-lambda"
 
   function_name = "concatPages"
   description = "concatenates all the page files created by createPages lambda."
