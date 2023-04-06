@@ -87,13 +87,12 @@ def submit_query_gtf(query_process, request_id, region_id, last_batch,
         if is_last:
             print("last Batch")
         if timer.time_for_second_split():
+            # Call self with remaining data
             remaining_coords = total_coords[idx:]
             print(f"remaining Coords length {len(remaining_coords)}")
             tot_size = len(json.dumps(remaining_coords,
                                       separators=(',', ':'))) + 1
             if tot_size < PAYLOAD_SIZE:
-                # Remaining coords are still too big for SNS to handle
-                # Call itself with remaining data
                 sns_publish(QUERY_VCF_SUBMIT_SNS_TOPIC_ARN, {
                     'coords': remaining_coords,
                     'requestID': request_id,
@@ -101,6 +100,7 @@ def submit_query_gtf(query_process, request_id, region_id, last_batch,
                     'lastBatch': last_batch,
                 })
             else:
+                # Remaining coords are still too big for SNS to handle.
                 # Since coords are generally similar size because it's
                 # made of chr, loc, ref, alt - we know 10 batches of 700
                 # records can be handled by SNS
