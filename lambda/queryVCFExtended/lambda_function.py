@@ -117,6 +117,7 @@ def submit_query_gtf(query_process, request_id, region_id, last_batch,
             break
         else:
             print(batch_id)
+            create_temp_file(request_id, batch_id)
             sns_publish(QUERY_GTF_SNS_TOPIC_ARN, {
                 'coords': total_coords[idx],
                 'APIid': request_id,
