@@ -105,12 +105,14 @@ def submit_query_gtf(query_process, request_id, region_id, last_batch,
                 # made of chr, loc, ref, alt - we know 10 batches of 700
                 # records can be handled by SNS
                 for i in range(0, len(remaining_coords), BATCH_CHUNK_SIZE):
-                    # TODO: Make this only publish last_batch once
                     sns_publish(QUERY_VCF_SUBMIT_SNS_TOPIC_ARN, {
                         'coords': remaining_coords[i:i+BATCH_CHUNK_SIZE],
                         'requestID': request_id,
                         'batchID': f'{batch_id}_sns{i}',
-                        'lastBatch': last_batch,
+                        # The choice of lastBatch is arbitrary in this
+                        # case, so we'll just mark the first one as it's
+                        # quicker to check.
+                        'lastBatch': (i == 0) and last_batch,
                     })
             break
         else:
