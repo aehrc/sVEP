@@ -1,93 +1,95 @@
-import datetime
 import json
 import os
-import subprocess
 import time
-import sys
+
 import boto3
-#from smart_open_reduced import BufferedOutputBase
-#global vars
+
+
+# AWS clients and resources
 s3 = boto3.client('s3')
-s3Obj = boto3.resource('s3')
 sns = boto3.client('sns')
-#environ variables
+
+# Environment variables
 SVEP_TEMP = os.environ['SVEP_TEMP']
 CONCAT_SNS_TOPIC_ARN = os.environ['CONCAT_SNS_TOPIC_ARN']
 CREATEPAGES_SNS_TOPIC_ARN = os.environ['CREATEPAGES_SNS_TOPIC_ARN']
 SVEP_REGIONS = os.environ['SVEP_REGIONS']
-os.environ['PATH'] += ':' + os.environ['LAMBDA_TASK_ROOT']
+os.environ['PATH'] += f':{os.environ["LAMBDA_TASK_ROOT"]}'
 
 
-
-def publishResult( APIid, batchID):
-    pre = APIid+"_"+batchID
-
-    if(len(s3.list_objects_v2(Bucket=SVEP_REGIONS, Prefix=pre)['Contents']) == 2):
-        bucket = s3Obj.Bucket(SVEP_REGIONS)
-        content = []
-        pageNum =0
+def publish_result(api_id, batch_id):
+    pre = f'{api_id}_{batch_id}'
+    response = s3.list_objects_v2(Bucket=SVEP_REGIONS, Prefix=pre)
+    if len(response['Contents']) == 2:
+        page_num = 0
         paginator = s3.get_paginator('list_objects_v2')
-        operation_parameters = {'Bucket': SVEP_REGIONS,
-                                'Prefix': APIid,
-                                'PaginationConfig' : {  'PageSize': 600}} #change later on
-        page_iterator = paginator.paginate(**operation_parameters)
-        kwargs = {
-            'TopicArn': CREATEPAGES_SNS_TOPIC_ARN,
+        # Change later on
+        operation_parameters = {
+            'Bucket': SVEP_REGIONS,
+            'Prefix': api_id,
+            'PaginationConfig': {
+                'PageSize': 600
+            }
         }
-
+        page_iterator = paginator.paginate(**operation_parameters)
+        message = {
+            'APIid': api_id,
+            'prefix': f'{api_id}_page',
+        }
         for page in page_iterator:
-        #for obj in bucket.objects.filter(Prefix=APIid):
-            pageContents = page['Contents']
-            pageKeys = [d['Key'] for d in pageContents]
-            pageNum+=1
-            prefix=APIid+"_page"
-            if('NextContinuationToken' in page):
-                kwargs['Message'] = json.dumps({'APIid':APIid,'pageKeys' : pageKeys,'pageNum' : pageNum,'prefix' :prefix,'lastPage': 0})
-                print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
-                response = sns.publish(**kwargs)
-                #print('Received Response: {}'.format(json.dumps(response)))
+            page_contents = page['Contents']
+            page_keys = [d['Key'] for d in page_contents]
+            page_num += 1
+            message.update({
+                'pageKeys': page_keys,
+                'pageNum': page_num,
+            })
+            if 'NextContinuationToken' in page:
+                message['lastPage'] = 0
             else:
                 print("last page")
-                print(pageNum)
-                kwargs['Message'] = json.dumps({'APIid':APIid,'pageKeys' : pageKeys,'pageNum' : pageNum,'prefix' :prefix,'lastPage': 1})
-                print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
-                response = sns.publish(**kwargs)
-
-                #print('Received Response: {}'.format(json.dumps(response)))
-        print(" Done sending to CREATEPAGES")
+                print(page_num)
+                message['lastPage'] = 1
+            sns_publish(CREATEPAGES_SNS_TOPIC_ARN, message)
+        print("Done sending to CREATEPAGES")
     else:
         print("last BatchID doesnt exist yet- resending to concat")
-        kwargs = {
-            'TopicArn': CONCAT_SNS_TOPIC_ARN,
-        }
-        kwargs['Message'] = json.dumps({'APIid' : APIid,'lastBatchID' : batchID})
-        print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
-        response = sns.publish(**kwargs)
-        #print('Received Response: {}'.format(json.dumps(response)))
+        resend_to_concat(api_id, batch_id)
 
-def queryDataset(APIid,batchID):
+
+def query_dataset(api_id, batch_id):
     objs = s3.list_objects(Bucket=SVEP_TEMP)
-    #print(exists(s3.list_objects(Bucket=SVEP_TEMP)['Contents']))
-    if('Contents' in objs):
+    if 'Contents' in objs:
         print("resending for concat")
-        kwargs = {
-            'TopicArn': CONCAT_SNS_TOPIC_ARN,
-        }
-        kwargs['Message'] = json.dumps({'APIid' : APIid,'lastBatchID' : batchID})
-        print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
-        response = sns.publish(**kwargs)
-        #print('Received Response: {}'.format(json.dumps(response)))
+        resend_to_concat(api_id, batch_id)
     else:
-        publishResult(APIid, batchID)
+        publish_result(api_id, batch_id)
 
 
-def lambda_handler(event, context):
-    print('Event Received: {}'.format(json.dumps(event)))
-    ################test#################
-    #message = json.loads(event['Message'])
-    #######################################
+# TODO: change this to a separate low-memory function
+def resend_to_concat(api_id, batch_id):
+    time.sleep(5)  # Just to reduce log message spam
+    message = {
+        'APIid': api_id,
+        'lastBatchID': batch_id,
+    }
+    sns_publish(CONCAT_SNS_TOPIC_ARN, message)
+    # We end here so this environment is available to immediately pick
+    # up the published message.
+
+
+def sns_publish(topic_arn, message):
+    kwargs = {
+        'TopicArn': topic_arn,
+        'Message': json.dumps(message),
+    }
+    print(f"Publishing to SNS: {json.dumps(kwargs)}")
+    sns.publish(**kwargs)
+
+
+def lambda_handler(event, _):
+    print(f"Event Received: {json.dumps(event)}")
     message = json.loads(event['Records'][0]['Sns']['Message'])
-    APIid = message['APIid']
-    batchID = message['lastBatchID']
-    #time.sleep(8)
-    queryDataset(APIid,batchID)
+    api_id = message['APIid']
+    batch_id = message['lastBatchID']
+    query_dataset(api_id, batch_id)

@@ -4,7 +4,7 @@ import shutil
 
 def clear_tmp():
     for file_name in os.listdir('/tmp'):
-        file_path = '/tmp/' + file_name
+        file_path = f'/tmp/{file_name}'
         if os.path.isfile(file_path):
             os.unlink(file_path)
         elif os.path.isdir(file_path):

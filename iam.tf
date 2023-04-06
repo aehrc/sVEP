@@ -193,7 +193,6 @@ data "aws_iam_policy_document" "lambda-createPages" {
       "SNS:Publish",
     ]
     resources = [
-      aws_sns_topic.concat.arn,
       aws_sns_topic.concatPages.arn,
       aws_sns_topic.createPages.arn,
     ]

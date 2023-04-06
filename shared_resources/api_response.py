@@ -1,6 +1,7 @@
 import json
 
-HEADERS = {"Access-Control-Allow-Origin": "*"}
+
+HEADERS = {'Access-Control-Allow-Origin': '*'}
 
 
 def bad_request(data, extra_params=None):
@@ -25,7 +26,7 @@ def bundle_response(status_code, body):
 
 def missing_parameter(*parameters):
     if len(parameters) > 1:
-        required = "one of {}".format(', '.join(parameters))
+        required = f"one of {', '.join(parameters)}"
     else:
         required = parameters[0]
-    return "{} must be specified".format(required)
+    return f"{required} must be specified"

@@ -1,107 +1,117 @@
-import datetime
 import json
 import os
-import subprocess
-import time
-import sys
+
 import boto3
 
-#global vars
+
+# AWS clients and resources
 s3 = boto3.client('s3')
 s3Obj = boto3.resource('s3')
 sns = boto3.client('sns')
-allFiles =[]
-#environ variables
+
+# Environment variables
 SVEP_REGIONS = os.environ['SVEP_REGIONS']
 SVEP_RESULTS = os.environ['SVEP_RESULTS']
 CONCATPAGES_SNS_TOPIC_ARN = os.environ['CONCATPAGES_SNS_TOPIC_ARN']
 CREATEPAGES_SNS_TOPIC_ARN = os.environ['CREATEPAGES_SNS_TOPIC_ARN']
-os.environ['PATH'] += ':' + os.environ['LAMBDA_TASK_ROOT']
-
-def publishResult(APIid,pageKeys, pageNum,prefix,dontAppend, lastPage):
-    filename = prefix+str(pageNum)+"concatenated.tsv"
-    allFiles.append(filename)
-    content=[]
-    if(dontAppend == 0):
-        for pageKey in pageKeys:
-        #    print(pageContent['Key'])
-            obj = s3.get_object(Bucket=SVEP_REGIONS, Key=pageKey)
-            body = obj['Body'].read()
-            #body = body +b"\n"
-            content.append(body)
-            #s3Obj.Object(Bucket=SVEP_REGIONS, Key=pageKey).delete()
-        #todo - cleanup - delete the obj once the content is read and stored in memory
-        s3Obj.Object(SVEP_REGIONS, filename).put(Body=(b"\n".join(content)))#add \n if necessary
-    #print(" Done concatenating")
-    if(lastPage == 1):
-        print(prefix)
-        bucketLen = len(s3.list_objects_v2(Bucket=SVEP_REGIONS, Prefix=prefix)['Contents'])
-        if( bucketLen != pageNum):
-            print("calling itself again to make sure all files are done.")
-            kwargs = {'TopicArn': CREATEPAGES_SNS_TOPIC_ARN,}
-            kwargs['Message'] = json.dumps({'APIid':APIid,'pageKeys' : pageKeys,'pageNum' : pageNum,'prefix' :prefix,'dontAppend' : 1,'lastPage': 1})
-            print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
-            response = sns.publish(**kwargs)
-            #print('Received Response: {}'.format(json.dumps(response)))
-        elif( bucketLen == pageNum and bucketLen > 10):
-            newPrefix = prefix+'_round'
-            kwargs = {'TopicArn': CREATEPAGES_SNS_TOPIC_ARN,}
-            prefixFiles = s3.list_objects_v2(Bucket=SVEP_REGIONS, Prefix=prefix)['Contents']
-            prefixKeys = [d['Key'] for d in prefixFiles]
-
-            allKeys = [prefixKeys[x:x+20] for x in range(0, len(prefixKeys), 20)]
-            print("length of all keys =", len(allKeys))
-            totalLen = len(allKeys)
-            for idx,key in enumerate(allKeys, start=1):
-                if(idx == totalLen):
-                    kwargs['Message'] = json.dumps({'APIid':APIid,'pageKeys' : allKeys[idx-1],'pageNum' : idx,'prefix' :newPrefix,'lastPage': 1})
-                    print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
-                    response = sns.publish(**kwargs)
-                    #print('Received Response: {}'.format(json.dumps(response)))
-                else:
-                    kwargs['Message'] = json.dumps({'APIid':APIid,'pageKeys' : allKeys[idx-1],'pageNum' : idx,'prefix' :newPrefix,'lastPage': 0})
-                    print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
-                    response = sns.publish(**kwargs)
-                    #print('Received Response: {}'.format(json.dumps(response)))
-
-        elif( bucketLen == pageNum and bucketLen < 10):
-                #if(lastPage == 1 && len(allFiles) == 1):
-                print("last page and all combined")
-                Files = s3.list_objects_v2(Bucket=SVEP_REGIONS, Prefix=prefix)['Contents']
-                allKeys = [d['Key'] for d in Files]
-
-                kwargs = {
-                    'TopicArn': CONCATPAGES_SNS_TOPIC_ARN,
-                }
-                kwargs['Message'] = json.dumps({'APIid' : APIid,'allKeys':allKeys,'lastFile' : filename,'pageNum' : pageNum, 'prefix': prefix})
-                print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
-                response = sns.publish(**kwargs)
-                #print('Received Response: {}'.format(json.dumps(response)))
-                    #trigger another lambda to concat all pages
-        elif(bucketLen == 1):
-            resultFile = APIid+"_results.tsv"
-            prefixFiles = s3.list_objects_v2(Bucket=SVEP_REGIONS, Prefix=prefix)['Contents']
-            prefixKeys = prefixFiles[0]['Key']
-            copy_source = {
-                'Bucket': SVEP_REGIONS,
-                'Key': prefixKeys
-            }
-            s3.meta.client.copy(copy_source, SVEP_RESULTS , resultFile)
+os.environ['PATH'] += f':{os.environ["LAMBDA_TASK_ROOT"]}'
 
 
-def lambda_handler(event, context):
-    print('Event Received: {}'.format(json.dumps(event)))
-    ################test#################
-    #message = json.loads(event['Message'])
-    #######################################
+def append(page_keys, page_num, prefix):
+    filename = f'{prefix}{page_num}concatenated.tsv'
+    content = []
+    for page_key in page_keys:
+        obj = s3.get_object(Bucket=SVEP_REGIONS, Key=page_key)
+        body = obj['Body'].read()
+        content.append(body)
+    s3Obj.Object(SVEP_REGIONS, filename).put(Body=(b'\n'.join(content)))
+
+
+def publish_result(api_id, page_keys, page_num, prefix):
+    filename = f'{prefix}{page_num}concatenated.tsv'
+    print(prefix)
+    bucket_len = len(s3_list_objects(SVEP_REGIONS, prefix))
+    if bucket_len != page_num:
+        print("calling itself again to make sure all files are done.")
+        sns_publish(CREATEPAGES_SNS_TOPIC_ARN, {
+            'APIid': api_id,
+            'pageKeys': page_keys,
+            'pageNum': page_num,
+            'prefix': prefix,
+            'dontAppend': 1,
+            'lastPage': 1,
+        })
+    elif bucket_len == page_num and bucket_len > 10:
+        new_prefix = f'{prefix}_round'
+        prefix_files = s3_list_objects(SVEP_REGIONS, prefix)
+        prefix_keys = [
+            d['Key']
+            for d in prefix_files
+        ]
+        all_keys = [
+            prefix_keys[x:x + 20]
+            for x in range(0, len(prefix_keys), 20)
+        ]
+        print(f"length of all keys = {len(all_keys)}")
+        total_len = len(all_keys)
+        for idx, key in enumerate(all_keys, start=1):
+            sns_publish(CREATEPAGES_SNS_TOPIC_ARN, {
+                'APIid': api_id,
+                'pageKeys': all_keys[idx - 1],
+                'pageNum': idx,
+                'prefix': new_prefix,
+                'lastPage': 1 if idx == total_len else 0,
+                 })
+    elif bucket_len == page_num and bucket_len < 10:
+        print("last page and all combined")
+        files = s3_list_objects(SVEP_REGIONS, prefix)
+        all_keys = [
+            d['Key']
+            for d in files
+        ]
+        sns_publish(CONCATPAGES_SNS_TOPIC_ARN, {
+            'APIid': api_id,
+            'allKeys': all_keys,
+            'lastFile': filename,
+            'pageNum': page_num,
+            'prefix': prefix,
+        })
+        # trigger another lambda to concat all pages
+    elif bucket_len == 1:
+        result_file = f'{api_id}_results.tsv'
+        prefix_files = s3_list_objects(SVEP_REGIONS, prefix)
+        prefix_keys = prefix_files[0]['Key']
+        copy_source = {
+            'Bucket': SVEP_REGIONS,
+            'Key': prefix_keys
+        }
+        s3.meta.client.copy(copy_source, SVEP_RESULTS, result_file)
+
+
+def s3_list_objects(bucket, prefix):
+    response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
+    return response['Contents']
+
+
+def sns_publish(topic_arn, message):
+    kwargs = {
+        'TopicArn': topic_arn,
+        'Message': json.dumps(message),
+    }
+    print(f"Publishing to SNS: {json.dumps(kwargs)}")
+    sns.publish(**kwargs)
+
+
+def lambda_handler(event, _):
+    print(f"Event Received: {json.dumps(event)}")
     message = json.loads(event['Records'][0]['Sns']['Message'])
-    APIid = message['APIid']
-    pageKeys = message['pageKeys']
-    pageNum = message['pageNum']
+    api_id = message['APIid']
+    page_keys = message['pageKeys']
+    page_num = message['pageNum']
     prefix = message['prefix']
-    lastPage = message['lastPage']
-    dontAppend = 0
-    if('dontAppend' in message):
-        dontAppend = message['dontAppend']
-    #time.sleep(8)
-    publishResult(APIid,pageKeys, pageNum,prefix,dontAppend, lastPage)
+    last_page = message['lastPage']
+    dont_append = message.get('dontAppend', 0)
+    if dont_append == 0:
+        append(page_keys, page_num, prefix)
+    if last_page == 1:
+        publish_result(api_id, page_keys, page_num, prefix)

@@ -1,69 +1,57 @@
-import datetime
 import json
 import os
-import subprocess
 import time
-import sys
+
 import boto3
+
 import s3fs
-#global vars
+
+
+# AWS clients and resources
 fs = s3fs.S3FileSystem(anon=False)
 s3 = boto3.client('s3')
-s3Obj = boto3.resource('s3')
 sns = boto3.client('sns')
-#environ variables
+
+# Environment variables
 SVEP_REGIONS = os.environ['SVEP_REGIONS']
 SVEP_RESULTS = os.environ['SVEP_RESULTS']
 CONCATPAGES_SNS_TOPIC_ARN = os.environ['CONCATPAGES_SNS_TOPIC_ARN']
-os.environ['PATH'] += ':' + os.environ['LAMBDA_TASK_ROOT']
+os.environ['PATH'] += f':{os.environ["LAMBDA_TASK_ROOT"]}'
 
 
-def publishResult(APIid, allKeys, lastFile, pageNum,prefix,context):
-    startTime = time.time()
-    #pre = APIid+"_page"
-    filename = APIid+"_results.tsv"
-    filePath = "s3://"+SVEP_RESULTS+"/"+filename
-    #if(len(s3.list_objects_v2(Bucket=SVEP_REGIONS, Prefix=lastFile)['Contents']) == 1):
-    if(len(s3.list_objects_v2(Bucket=SVEP_REGIONS, Prefix=prefix)['Contents']) == pageNum):
-        Files = s3.list_objects_v2(Bucket=SVEP_REGIONS, Prefix=prefix)['Contents']
-        #allKeys = [d['Key'] for d in Files]
-        paths = [SVEP_REGIONS+"/"+d for d in allKeys]
-        #paths = [SVEP_REGIONS+"/"+d['Key'] for d in Files]
-        fs.merge(path=filePath,filelist=paths)
-        content = []
-        print("time taken = ", (time.time() - startTime)*1000)
-        print(" Done concatenating")
+def publish_result(api_id, all_keys, last_file, page_num, prefix):
+    start_time = time.time()
+    filename = f'{api_id}_results.tsv'
+    file_path = f's3://{SVEP_RESULTS}/{filename}'
+    response = s3.list_objects_v2(Bucket=SVEP_REGIONS, Prefix=prefix)
+    if len(response['Contents']) == page_num:
+        paths = [
+            f'{SVEP_REGIONS}/{d}'
+            for d in all_keys
+        ]
+        fs.merge(path=file_path, filelist=paths)
+        print(f"time taken = {(time.time()-start_time) * 1000}")
+        print("Done concatenating")
     else:
         print("createPages failed to create one of the page")
         kwargs = {
             'TopicArn': CONCATPAGES_SNS_TOPIC_ARN,
+            'Message': json.dumps({
+                'APIid': api_id,
+                'lastFile': last_file,
+                'pageNum': page_num,
+            }),
         }
-        kwargs['Message'] = json.dumps({'APIid' : APIid,'lastFile' : lastFile,'pageNum' : pageNum})
-        print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
-        response = sns.publish(**kwargs)
-        #print('Received Response: {}'.format(json.dumps(response)))
-    '''else:
-        print("Still waiting for the last page to be created")
-        kwargs = {
-            'TopicArn': CONCATPAGES_SNS_TOPIC_ARN,
-        }
-        kwargs['Message'] = json.dumps({'APIid' : APIid,'lastFile' : lastFile,'pageNum' : pageNum})
-        print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
-        response = sns.publish(**kwargs)
-        #print('Received Response: {}'.format(json.dumps(response)))'''
+        print(f"Publishing to SNS: {json.dumps(kwargs)}")
+        sns.publish(**kwargs)
 
 
-def lambda_handler(event, context):
-    print('Event Received: {}'.format(json.dumps(event)))
-    ################test#################
-    #message = json.loads(event['Message'])
-    #######################################
+def lambda_handler(event, _):
+    print(f"Event Received: {json.dumps(event)}")
     message = json.loads(event['Records'][0]['Sns']['Message'])
-    APIid = message['APIid']
-    allKeys = message['allKeys']
-    lastFile = message['lastFile']
-    pageNum = message['pageNum']
+    api_id = message['APIid']
+    all_keys = message['allKeys']
+    last_file = message['lastFile']
+    page_num = message['pageNum']
     prefix = message['prefix']
-
-    #time.sleep(8)
-    publishResult(APIid,allKeys,lastFile, pageNum,prefix,context)
+    publish_result(api_id, all_keys, last_file, page_num, prefix)
