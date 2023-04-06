@@ -98,7 +98,7 @@ def submit_query_gtf(query_process, request_id, region_id, last_batch,
                     'coords': remaining_coords,
                     'requestID': request_id,
                     'batchID': batch_id,
-                    'lastBatch': is_last,
+                    'lastBatch': last_batch,
                 })
             else:
                 # Since coords are generally similar size because it's
@@ -112,7 +112,7 @@ def submit_query_gtf(query_process, request_id, region_id, last_batch,
                         # The choice of lastBatch is arbitrary in this
                         # case, so we'll just mark the first one as it's
                         # quicker to check.
-                        'lastBatch': (i == 0) and is_last,
+                        'lastBatch': (i == 0) and last_batch,
                     })
             break
         else:
