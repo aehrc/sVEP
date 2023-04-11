@@ -1,12 +1,23 @@
 #
-# queryVCF Lambda Function
+# initQuery Lambda Function
 #
-resource "aws_lambda_permission" "APIqueryVCF" {
-  statement_id = "AllowqueryVCFInvoke"
+resource "aws_lambda_permission" "APIinitQuery" {
+  statement_id = "AllowinitQueryInvoke"
   action = "lambda:InvokeFunction"
-  function_name = module.lambda-queryVCF.function_name
+  function_name = module.lambda-initQuery.function_name
   principal = "apigateway.amazonaws.com"
   source_arn = "${aws_api_gateway_rest_api.VPApi.execution_arn}/*/*/${aws_api_gateway_resource.submit.path_part}"
+}
+
+#
+# queryVCF Lambda Function
+#
+resource "aws_lambda_permission" "SNSLambdaqueryVCF" {
+  statement_id = "SNSLambdaqueryVCF"
+  action = "lambda:InvokeFunction"
+  function_name = module.lambda-queryVCF.function_name
+  principal = "sns.amazonaws.com"
+  source_arn = aws_sns_topic.queryVCF.arn
 }
 
 #
@@ -18,17 +29,6 @@ resource "aws_lambda_permission" "SNSLambdaqueryVCFsubmit" {
   function_name = module.lambda-queryVCFsubmit.function_name
   principal = "sns.amazonaws.com"
   source_arn = aws_sns_topic.queryVCFsubmit.arn
-}
-
-#
-# queryVCFExtended Lambda Function
-#
-resource "aws_lambda_permission" "SNSLambdaqueryVCFExtended" {
-  statement_id = "SNSLambdaqueryVCFExtended"
-  action = "lambda:InvokeFunction"
-  function_name = module.lambda-queryVCFExtended.function_name
-  principal = "sns.amazonaws.com"
-  source_arn = aws_sns_topic.queryVCFExtended.arn
 }
 
 #

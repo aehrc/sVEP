@@ -1,11 +1,11 @@
-resource "aws_sns_topic" "queryVCFExtended" {
-  name = "queryVCFExtended"
+resource "aws_sns_topic" "queryVCF" {
+  name = "queryVCF"
 }
 
-resource "aws_sns_topic_subscription" "queryVCFExtended" {
-  topic_arn = aws_sns_topic.queryVCFExtended.arn
+resource "aws_sns_topic_subscription" "queryVCF" {
+  topic_arn = aws_sns_topic.queryVCF.arn
   protocol = "lambda"
-  endpoint = module.lambda-queryVCFExtended.function_arn
+  endpoint = module.lambda-queryVCF.function_arn
 }
 resource "aws_sns_topic" "queryVCFsubmit" {
   name = "queryVCFsubmit"

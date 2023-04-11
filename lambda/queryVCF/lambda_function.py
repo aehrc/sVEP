@@ -4,9 +4,6 @@ import subprocess
 
 import boto3
 
-from api_response import bad_request, bundle_response
-import chrom_matching
-
 
 # AWS clients and resources
 s3 = boto3.resource('s3')
@@ -15,17 +12,16 @@ sns = boto3.client('sns')
 # Environment variables
 SVEP_TEMP = os.environ['SVEP_TEMP']
 QUERY_GTF_SNS_TOPIC_ARN = os.environ['QUERY_GTF_SNS_TOPIC_ARN']
-QUERY_VCF_EXTENDED_SNS_TOPIC_ARN = os.environ['QUERY_VCF_EXTENDED_SNS_TOPIC_ARN']
+QUERY_VCF_SNS_TOPIC_ARN = os.environ['QUERY_VCF_SNS_TOPIC_ARN']
 QUERY_VCF_SUBMIT_SNS_TOPIC_ARN = os.environ['QUERY_VCF_SUBMIT_SNS_TOPIC_ARN']
 os.environ['PATH'] += f':{os.environ["LAMBDA_TASK_ROOT"]}'
 
 MILLISECONDS_BEFORE_SPLIT = 15000
-MILLISECONDS_BEFORE_SECOND_SPLIT = 8000
-SLICE_SIZE_MBP = 5
+MILLISECONDS_BEFORE_SECOND_SPLIT = 6000
+SLICE_SIZE_MBP = 5  # TODO: Sync this with initQuery
 RECORDS_PER_SAMPLE = 700
 BATCH_CHUNK_SIZE = 10
 PAYLOAD_SIZE = 260000
-REGIONS = chrom_matching.get_regions(SLICE_SIZE_MBP)
 
 
 class Timer:
@@ -37,21 +33,6 @@ class Timer:
 
     def time_for_second_split(self):
         return self.milliseconds_left() <= MILLISECONDS_BEFORE_SECOND_SPLIT
-
-
-def get_translated_regions(location):
-    vcf_chromosomes = chrom_matching.get_vcf_chromosomes(location)
-    vcf_regions = []
-    for target_chromosome, region_list in REGIONS.items():
-        chromosome = chrom_matching.get_matching_chromosome(vcf_chromosomes,
-                                                            target_chromosome)
-        if not chromosome:
-            continue
-        vcf_regions += [
-            f'{chromosome}:{region}'
-            for region in region_list
-        ]
-    return vcf_regions
 
 
 def get_query_process(location, chrom, start, end):
@@ -138,25 +119,17 @@ def sns_publish(topic_arn, message):
 def lambda_handler(event, context):
     print(f"Event Received: {json.dumps(event)}")
     timer = Timer(context)
-    event_body = event.get('body')
-    if not event_body:
-        return bad_request("No body sent with request.")
-    try:
-        body_dict = json.loads(event_body)
-        request_id = event['requestContext']['requestId']
-        location = body_dict['location']
-        vcf_regions = get_translated_regions(location)
-    except ValueError:
-        return bad_request("Error parsing request body, Expected JSON.")
-
-    print(vcf_regions)
+    message = json.loads(event['Records'][0]['Sns']['Message'])
+    vcf_regions = message['regions']
+    request_id = message['requestID']
+    location = message['location']
     final_data = len(vcf_regions) - 1
     for index, region in enumerate(vcf_regions):
         if timer.time_for_first_split():
             new_regions = vcf_regions[index:]
             print(f"New Regions {new_regions}")
             # Publish SNS for itself!
-            sns_publish(QUERY_VCF_EXTENDED_SNS_TOPIC_ARN, {
+            sns_publish(QUERY_VCF_SNS_TOPIC_ARN, {
                 'regions': new_regions,
                 'requestID': request_id,
                 'location': location,
@@ -170,4 +143,3 @@ def lambda_handler(event, context):
             query_process = get_query_process(location, chrom, start, end)
             submit_query_gtf(query_process, request_id, region_id,
                              int(index == final_data), timer)
-    return bundle_response(200, "Process started")

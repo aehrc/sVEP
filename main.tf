@@ -3,13 +3,38 @@ locals {
 }
 
 #
+# initQuery Lambda Function
+#
+module "lambda-initQuery" {
+  source = "github.com/bhosking/terraform-aws-lambda"
+
+  function_name = "initQuery"
+  description = "Invokes queryVCF with the calculated regions"
+  handler = "lambda_function.lambda_handler"
+  runtime = "python3.9"
+  memory_size = 1792
+  timeout = 28
+  policy = {
+    json = data.aws_iam_policy_document.lambda-initQuery.json
+  }
+  source_path = "${path.module}/lambda/initQuery"
+  #tags = var.common-tags
+
+  environment ={
+    variables = {
+      QUERY_VCF_SNS_TOPIC_ARN = aws_sns_topic.queryVCF.arn
+    }
+  }
+}
+
+#
 # queryVCF Lambda Function
 #
 module "lambda-queryVCF" {
   source = "github.com/bhosking/terraform-aws-lambda"
 
   function_name = "queryVCF"
-  description = "Invokes infoSplitter for each dataset and returns result"
+  description = "Invokes queryGTF for each region."
   handler = "lambda_function.lambda_handler"
   runtime = "python3.9"
   memory_size = 2048
@@ -24,35 +49,7 @@ module "lambda-queryVCF" {
     variables = {
       SVEP_TEMP = aws_s3_bucket.svep-temp.bucket
       QUERY_GTF_SNS_TOPIC_ARN = aws_sns_topic.queryGTF.arn
-      QUERY_VCF_EXTENDED_SNS_TOPIC_ARN = aws_sns_topic.queryVCFExtended.arn
-      QUERY_VCF_SUBMIT_SNS_TOPIC_ARN = aws_sns_topic.queryVCFsubmit.arn
-    }
-  }
-}
-
-#
-# queryVCFExtended Lambda Function
-#
-module "lambda-queryVCFExtended" {
-  source = "github.com/bhosking/terraform-aws-lambda"
-
-  function_name = "queryVCFExtended"
-  description = "Invokes infoSplitter for each dataset and returns result"
-  handler = "lambda_function.lambda_handler"
-  runtime = "python3.9"
-  memory_size = 2048
-  timeout = 28
-  policy = {
-    json = data.aws_iam_policy_document.lambda-queryVCFExtended.json
-  }
-  source_path = "${path.module}/lambda/queryVCFExtended"
-  #tags = var.common-tags
-
-  environment ={
-    variables = {
-      SVEP_TEMP = aws_s3_bucket.svep-temp.bucket
-      QUERY_GTF_SNS_TOPIC_ARN = aws_sns_topic.queryGTF.arn
-      QUERY_VCF_EXTENDED_SNS_TOPIC_ARN = aws_sns_topic.queryVCFExtended.arn
+      QUERY_VCF_SNS_TOPIC_ARN = aws_sns_topic.queryVCF.arn
       QUERY_VCF_SUBMIT_SNS_TOPIC_ARN = aws_sns_topic.queryVCFsubmit.arn
     }
   }

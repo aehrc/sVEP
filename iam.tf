@@ -14,6 +14,26 @@ data "aws_iam_policy_document" "main-apigateway" {
 }
 
 #
+# initQuery Lambda Function
+#
+data "aws_iam_policy_document" "lambda-initQuery" {
+  statement {
+    actions = [
+      "SNS:Publish",
+    ]
+    resources = [
+      aws_sns_topic.queryVCF.arn,
+    ]
+  }
+  statement {
+    actions = [
+      "s3:GetObject",
+    ]
+    resources = ["*"]
+  }
+}
+
+#
 # queryVCF Lambda Function
 #
 data "aws_iam_policy_document" "lambda-queryVCF" {
@@ -23,31 +43,7 @@ data "aws_iam_policy_document" "lambda-queryVCF" {
     ]
     resources = [
       aws_sns_topic.queryGTF.arn,
-      aws_sns_topic.queryVCFExtended.arn,
-      aws_sns_topic.queryVCFsubmit.arn,
-    ]
-  }
-  statement {
-    actions = [
-      "s3:GetObject",
-      "s3:ListBucket",
-      "s3:PutObject",
-    ]
-    resources = ["*"]
-  }
-}
-
-#
-# queryVCFExtended Lambda Function
-#
-data "aws_iam_policy_document" "lambda-queryVCFExtended" {
-  statement {
-    actions = [
-      "SNS:Publish",
-    ]
-    resources = [
-      aws_sns_topic.queryGTF.arn,
-      aws_sns_topic.queryVCFExtended.arn,
+      aws_sns_topic.queryVCF.arn,
       aws_sns_topic.queryVCFsubmit.arn,
     ]
   }
