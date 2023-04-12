@@ -71,30 +71,19 @@ def submit_query_gtf(query_process, request_id, region_id, last_batch,
             # Call self with remaining data
             remaining_coords = total_coords[idx:]
             print(f"remaining Coords length {len(remaining_coords)}")
-            tot_size = len(json.dumps(remaining_coords,
-                                      separators=(',', ':'))) + 1
-            if tot_size < PAYLOAD_SIZE:
+            # Since coords are generally similar size because it's
+            # made of chr, loc, ref, alt - we know 10 batches of 700
+            # records can be handled by SNS
+            for i in range(0, len(remaining_coords), BATCH_CHUNK_SIZE):
                 sns_publish(QUERY_VCF_SUBMIT_SNS_TOPIC_ARN, {
-                    'coords': remaining_coords,
+                    'coords': remaining_coords[i:i+BATCH_CHUNK_SIZE],
                     'requestID': request_id,
-                    'batchID': batch_id,
-                    'lastBatch': last_batch,
+                    'batchID': f'{batch_id}_sns{i}',
+                    # The choice of lastBatch is arbitrary in this
+                    # case, so we'll just mark the first one as it's
+                    # quicker to check.
+                    'lastBatch': (i == 0) and last_batch,
                 })
-            else:
-                # Remaining coords are still too big for SNS to handle.
-                # Since coords are generally similar size because it's
-                # made of chr, loc, ref, alt - we know 10 batches of 700
-                # records can be handled by SNS
-                for i in range(0, len(remaining_coords), BATCH_CHUNK_SIZE):
-                    sns_publish(QUERY_VCF_SUBMIT_SNS_TOPIC_ARN, {
-                        'coords': remaining_coords[i:i+BATCH_CHUNK_SIZE],
-                        'requestID': request_id,
-                        'batchID': f'{batch_id}_sns{i}',
-                        # The choice of lastBatch is arbitrary in this
-                        # case, so we'll just mark the first one as it's
-                        # quicker to check.
-                        'lastBatch': (i == 0) and last_batch,
-                    })
             break
         else:
             print(batch_id)
