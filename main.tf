@@ -1,5 +1,6 @@
 locals {
   api_version = "v1.0.0"
+  slice_size_mbp = 5
 }
 
 #
@@ -23,6 +24,7 @@ module "lambda-initQuery" {
   environment ={
     variables = {
       QUERY_VCF_SNS_TOPIC_ARN = aws_sns_topic.queryVCF.arn
+      SLICE_SIZE_MBP = local.slice_size_mbp
     }
   }
 }
@@ -51,6 +53,7 @@ module "lambda-queryVCF" {
       QUERY_GTF_SNS_TOPIC_ARN = aws_sns_topic.queryGTF.arn
       QUERY_VCF_SNS_TOPIC_ARN = aws_sns_topic.queryVCF.arn
       QUERY_VCF_SUBMIT_SNS_TOPIC_ARN = aws_sns_topic.queryVCFsubmit.arn
+      SLICE_SIZE_MBP = local.slice_size_mbp
     }
   }
 }

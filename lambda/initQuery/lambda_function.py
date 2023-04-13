@@ -8,9 +8,9 @@ from lambda_utils import print_event, sns_publish
 
 # Environment variables
 QUERY_VCF_SNS_TOPIC_ARN = os.environ['QUERY_VCF_SNS_TOPIC_ARN']
+SLICE_SIZE_MBP = int(os.environ['SLICE_SIZE_MBP'])
 os.environ['PATH'] += f':{os.environ["LAMBDA_TASK_ROOT"]}'
 
-SLICE_SIZE_MBP = 5
 REGIONS = chrom_matching.get_regions(SLICE_SIZE_MBP)
 
 
