@@ -30,7 +30,7 @@ def get_translated_regions(location):
 
 
 def lambda_handler(event, _):
-    print_event(event)
+    print_event(event, max_length=None)
     event_body = event.get('body')
     if not event_body:
         return bad_request("No body sent with request.")
