@@ -1,13 +1,13 @@
-import json
 import os
 import time
 
 import boto3
 
+from lambda_utils import get_sns_event, sns_publish
+
 
 # AWS clients and resources
 s3 = boto3.client('s3')
-sns = boto3.client('sns')
 
 # Environment variables
 SVEP_TEMP = os.environ['SVEP_TEMP']
@@ -78,18 +78,8 @@ def resend_to_concat(api_id, batch_id):
     # up the published message.
 
 
-def sns_publish(topic_arn, message):
-    kwargs = {
-        'TopicArn': topic_arn,
-        'Message': json.dumps(message),
-    }
-    print(f"Publishing to SNS: {json.dumps(kwargs)}")
-    sns.publish(**kwargs)
-
-
 def lambda_handler(event, _):
-    print(f"Event Received: {json.dumps(event)}")
-    message = json.loads(event['Records'][0]['Sns']['Message'])
+    message = get_sns_event(event)
     api_id = message['APIid']
     batch_id = message['lastBatchID']
     query_dataset(api_id, batch_id)

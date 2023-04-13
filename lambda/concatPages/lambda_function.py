@@ -1,16 +1,15 @@
-import json
 import os
 import time
 
 import boto3
 
+from lambda_utils import get_sns_event, sns_publish
 import s3fs
 
 
 # AWS clients and resources
 fs = s3fs.S3FileSystem(anon=False)
 s3 = boto3.client('s3')
-sns = boto3.client('sns')
 
 # Environment variables
 SVEP_REGIONS = os.environ['SVEP_REGIONS']
@@ -34,21 +33,15 @@ def publish_result(api_id, all_keys, last_file, page_num, prefix):
         print("Done concatenating")
     else:
         print("createPages failed to create one of the page")
-        kwargs = {
-            'TopicArn': CONCATPAGES_SNS_TOPIC_ARN,
-            'Message': json.dumps({
-                'APIid': api_id,
-                'lastFile': last_file,
-                'pageNum': page_num,
-            }),
-        }
-        print(f"Publishing to SNS: {json.dumps(kwargs)}")
-        sns.publish(**kwargs)
+        sns_publish(CONCATPAGES_SNS_TOPIC_ARN, {
+            'APIid': api_id,
+            'lastFile': last_file,
+            'pageNum': page_num,
+        })
 
 
 def lambda_handler(event, _):
-    print(f"Event Received: {json.dumps(event)}")
-    message = json.loads(event['Records'][0]['Sns']['Message'])
+    message = get_sns_event(event)
     api_id = message['APIid']
     all_keys = message['allKeys']
     last_file = message['lastFile']

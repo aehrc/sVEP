@@ -1,13 +1,12 @@
-import json
 import os
 
 import boto3
 
+from lambda_utils import get_sns_event, sns_publish, s3
 
-# AWS clients and resources
-s3 = boto3.client('s3')
-s3Obj = boto3.resource('s3')
-sns = boto3.client('sns')
+
+# AWS clients as s3 is a resource
+s3_client = boto3.client('s3')
 
 # Environment variables
 SVEP_REGIONS = os.environ['SVEP_REGIONS']
@@ -21,10 +20,10 @@ def append(page_keys, page_num, prefix):
     filename = f'{prefix}{page_num}concatenated.tsv'
     content = []
     for page_key in page_keys:
-        obj = s3.get_object(Bucket=SVEP_REGIONS, Key=page_key)
+        obj = s3_client.get_object(Bucket=SVEP_REGIONS, Key=page_key)
         body = obj['Body'].read()
         content.append(body)
-    s3Obj.Object(SVEP_REGIONS, filename).put(Body=(b'\n'.join(content)))
+    s3.Object(SVEP_REGIONS, filename).put(Body=(b'\n'.join(content)))
 
 
 def publish_result(api_id, page_keys, page_num, prefix):
@@ -85,26 +84,16 @@ def publish_result(api_id, page_keys, page_num, prefix):
             'Bucket': SVEP_REGIONS,
             'Key': prefix_keys
         }
-        s3.meta.client.copy(copy_source, SVEP_RESULTS, result_file)
+        s3_client.copy(copy_source, SVEP_RESULTS, result_file)
 
 
 def s3_list_objects(bucket, prefix):
-    response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
+    response = s3_client.list_objects_v2(Bucket=bucket, Prefix=prefix)
     return response['Contents']
 
 
-def sns_publish(topic_arn, message):
-    kwargs = {
-        'TopicArn': topic_arn,
-        'Message': json.dumps(message),
-    }
-    print(f"Publishing to SNS: {json.dumps(kwargs)}")
-    sns.publish(**kwargs)
-
-
 def lambda_handler(event, _):
-    print(f"Event Received: {json.dumps(event)}")
-    message = json.loads(event['Records'][0]['Sns']['Message'])
+    message = get_sns_event(event)
     api_id = message['APIid']
     page_keys = message['pageKeys']
     page_num = message['pageNum']

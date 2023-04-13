@@ -1,15 +1,10 @@
-import json
 import os
 import re
 import shlex
 import subprocess
 
-import boto3
+from lambda_utils import download_vcf, get_sns_event, sns_publish, s3
 
-
-# AWS clients and resources
-s3 = boto3.resource('s3')
-sns = boto3.client('sns')
 
 # Environment variables
 SVEP_TEMP = os.environ['SVEP_TEMP']
@@ -17,19 +12,13 @@ CONCAT_SNS_TOPIC_ARN = os.environ['CONCAT_SNS_TOPIC_ARN']
 REFERENCE_GENOME = os.environ['REFERENCE_GENOME']
 SVEP_REGIONS = os.environ['SVEP_REGIONS']
 os.environ['PATH'] += f':{os.environ["LAMBDA_TASK_ROOT"]}'
-KEYS = [
-    REFERENCE_GENOME,
-    f'{REFERENCE_GENOME}.tbi',
-]
 
 BUCKET_NAME = 'svep'
 TRANSCRIPT_ID_PATTERN = re.compile('transcript_id\\s\\\"(\\w+)\\\";',
                                    re.IGNORECASE)
 
 # Download reference genome and index
-for key in KEYS:
-    local_file_name = f'/tmp/{key}'
-    s3.Bucket(BUCKET_NAME).download_file(key, local_file_name)
+download_vcf(BUCKET_NAME, REFERENCE_GENOME)
 
 
 def get_stream_direction(pos, metadata):
@@ -115,8 +104,7 @@ def strict_split(item):
 
 
 def lambda_handler(event, _):
-    print(f"Event Received: {json.dumps(event)}")
-    message = json.loads(event['Records'][0]['Sns']['Message'])
+    message = get_sns_event(event)
     sns_data = message['snsData']
     api_id = message['APIid']
     batch_id = message['batchID']
@@ -171,12 +159,7 @@ def lambda_handler(event, _):
     print("deleted")
     if last_batch:
         print("sending for concat")
-        kwargs = {
-            'TopicArn': CONCAT_SNS_TOPIC_ARN,
-            'Message': json.dumps({
-                'APIid': api_id,
-                'lastBatchID': batch_id,
-            })
-        }
-        print(f"Publishing to SNS: {json.dumps(kwargs)}")
-        sns.publish(**kwargs)
+        sns_publish(CONCAT_SNS_TOPIC_ARN, {
+            'APIid': api_id,
+            'lastBatchID': batch_id,
+        })

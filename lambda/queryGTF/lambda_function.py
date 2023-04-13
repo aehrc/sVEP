@@ -2,12 +2,8 @@ import json
 import os
 import subprocess
 
-import boto3
+import lambda_utils
 
-
-# AWS clients and resources
-sns = boto3.client('sns')
-s3 = boto3.resource('s3')
 
 # Environment variables
 SVEP_TEMP = os.environ['SVEP_TEMP']
@@ -26,32 +22,7 @@ MILLISECONDS_BEFORE_SPLIT = 4000
 PAYLOAD_SIZE = 260000
 
 # Download reference genome and index
-KEYS = [
-    REFERENCE_GENOME,
-    f'{REFERENCE_GENOME}.tbi',
-]
-for key in KEYS:
-    local_file_name = f'/tmp/{key}'
-    s3.Bucket(BUCKET_NAME).download_file(key, local_file_name)
-
-
-class Timer:
-    def __init__(self, context):
-        self.milliseconds_left = context.get_remaining_time_in_millis
-
-    def out_of_time(self):
-        return self.milliseconds_left() <= MILLISECONDS_BEFORE_SPLIT
-
-
-def create_temp_file(filename):
-    print(f"File created is - {filename}")
-    s3.Object(SVEP_TEMP, filename).put(Body=b'')
-
-
-def delete_temp_file(api_id, batch_id):
-    filename = f'{api_id}_{batch_id}'
-    print(f"File deleting - {filename}")
-    s3.Object(SVEP_TEMP, filename).delete()
+lambda_utils.download_vcf(BUCKET_NAME, REFERENCE_GENOME)
 
 
 def overlap_feature(all_coords, api_id, batch_id, last_batch, timer):
@@ -108,16 +79,16 @@ def overlap_feature(all_coords, api_id, batch_id, last_batch, timer):
             #   lastBatch=last_batch.
             send_data_to_plugins(api_id, results, counter, batch_id,
                                  last_batch)
-            delete_temp_file(api_id, batch_id)
+            lambda_utils.delete_temp_file(SVEP_TEMP, api_id, batch_id)
 
 
 def send_data_to_plugins(api_id, results, counter, batch_id, last_batch):
     unique_batch_id = f'{batch_id}_{counter}'
     print(unique_batch_id)
     for topic in TOPICS:
-        temp_file_name = f'{api_id}_{unique_batch_id}_{topic}'
-        create_temp_file(temp_file_name)
-        sns_publish(topic, {
+        temp_file_name = lambda_utils.create_temp_file(SVEP_TEMP, api_id,
+                                                       unique_batch_id, topic)
+        lambda_utils.sns_publish(topic, {
             'snsData': results,
             'APIid': api_id,
             'batchID': unique_batch_id,
@@ -131,29 +102,19 @@ def send_data_to_plugins(api_id, results, counter, batch_id, last_batch):
 def send_data_to_self(api_id, remaining_coords, batch_id, counter, last_batch):
     unique_batch_id = f'{batch_id}_GTF{counter}'
     print("Less Time remaining - call itself.")
-    sns_publish(QUERY_GTF_SNS_TOPIC_ARN, {
+    lambda_utils.sns_publish(QUERY_GTF_SNS_TOPIC_ARN, {
         'coords': remaining_coords,
         'APIid': api_id,
         'batchID': unique_batch_id,
         'lastBatch': last_batch,
     })
-    create_temp_file(f'{api_id}_{unique_batch_id}')
-    delete_temp_file(api_id, batch_id)
-
-
-def sns_publish(topic_arn, message):
-    kwargs = {
-        'TopicArn': topic_arn,
-        'Message': json.dumps(message, separators=(',', ':')),
-    }
-    print(f"Publishing to SNS: {json.dumps(kwargs)}")
-    sns.publish(**kwargs)
+    lambda_utils.create_temp_file(SVEP_TEMP, api_id, unique_batch_id)
+    lambda_utils.delete_temp_file(SVEP_TEMP, api_id, batch_id)
 
 
 def lambda_handler(event, context):
-    print(f"Event Received: {json.dumps(event)}")
-    timer = Timer(context)
-    message = json.loads(event['Records'][0]['Sns']['Message'])
+    message = lambda_utils.get_sns_event(event)
+    timer = lambda_utils.Timer(context, MILLISECONDS_BEFORE_SPLIT)
     coords = message['coords']
     api_id = message['APIid']
     batch_id = message['batchID']

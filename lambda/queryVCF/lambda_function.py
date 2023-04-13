@@ -1,13 +1,8 @@
-import json
 import os
 import subprocess
 
-import boto3
+from lambda_utils import create_temp_file, get_sns_event, sns_publish, Timer
 
-
-# AWS clients and resources
-s3 = boto3.resource('s3')
-sns = boto3.client('sns')
 
 # Environment variables
 SVEP_TEMP = os.environ['SVEP_TEMP']
@@ -24,17 +19,6 @@ BATCH_CHUNK_SIZE = 10
 PAYLOAD_SIZE = 260000
 
 
-class Timer:
-    def __init__(self, context):
-        self.milliseconds_left = context.get_remaining_time_in_millis
-
-    def time_for_first_split(self):
-        return self.milliseconds_left() <= MILLISECONDS_BEFORE_SPLIT
-
-    def time_for_second_split(self):
-        return self.milliseconds_left() <= MILLISECONDS_BEFORE_SECOND_SPLIT
-
-
 def get_query_process(location, chrom, start, end):
     args = [
         'bcftools', 'query',
@@ -45,11 +29,6 @@ def get_query_process(location, chrom, start, end):
     return subprocess.Popen(args, stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE, cwd='/tmp',
                             encoding='ascii')
-
-
-def create_temp_file(api_id, batch_id):
-    filename = f'{api_id}_{batch_id}'
-    s3.Object(SVEP_TEMP, filename).put(Body=b'')
 
 
 def submit_query_gtf(query_process, request_id, region_id, last_batch,
@@ -67,7 +46,7 @@ def submit_query_gtf(query_process, request_id, region_id, last_batch,
         batch_id = f'{region_id}_{idx}'
         if is_last:
             print("last Batch")
-        if timer.time_for_second_split():
+        if timer.out_of_time():
             # Call self with remaining data
             remaining_coords = total_coords[idx:]
             print(f"remaining Coords length {len(remaining_coords)}")
@@ -87,7 +66,7 @@ def submit_query_gtf(query_process, request_id, region_id, last_batch,
             break
         else:
             print(batch_id)
-            create_temp_file(request_id, batch_id)
+            create_temp_file(SVEP_TEMP, request_id, batch_id)
             sns_publish(QUERY_GTF_SNS_TOPIC_ARN, {
                 'coords': total_coords[idx],
                 'APIid': request_id,
@@ -96,25 +75,16 @@ def submit_query_gtf(query_process, request_id, region_id, last_batch,
             })
 
 
-def sns_publish(topic_arn, message):
-    kwargs = {
-        'TopicArn': topic_arn,
-        'Message': json.dumps(message, separators=(',', ':')),
-    }
-    print(f"Publishing to SNS: {json.dumps(kwargs)}")
-    sns.publish(**kwargs)
-
-
 def lambda_handler(event, context):
-    print(f"Event Received: {json.dumps(event)}")
-    timer = Timer(context)
-    message = json.loads(event['Records'][0]['Sns']['Message'])
+    message = get_sns_event(event)
+    first_timer = Timer(context, MILLISECONDS_BEFORE_SPLIT)
+    second_timer = Timer(context, MILLISECONDS_BEFORE_SECOND_SPLIT)
     vcf_regions = message['regions']
     request_id = message['requestID']
     location = message['location']
     final_data = len(vcf_regions) - 1
     for index, region in enumerate(vcf_regions):
-        if timer.time_for_first_split():
+        if first_timer.out_of_time():
             new_regions = vcf_regions[index:]
             print(f"New Regions {new_regions}")
             # Publish SNS for itself!
@@ -131,4 +101,4 @@ def lambda_handler(event, context):
             end = start + round(1000000*SLICE_SIZE_MBP - 1)
             query_process = get_query_process(location, chrom, start, end)
             submit_query_gtf(query_process, request_id, region_id,
-                             int(index == final_data), timer)
+                             int(index == final_data), second_timer)

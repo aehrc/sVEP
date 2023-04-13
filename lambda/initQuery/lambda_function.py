@@ -1,14 +1,10 @@
 import json
 import os
 
-import boto3
-
 from api_response import bad_request, bundle_response
 import chrom_matching
+from lambda_utils import print_event, sns_publish
 
-
-# AWS clients and resources
-sns = boto3.client('sns')
 
 # Environment variables
 QUERY_VCF_SNS_TOPIC_ARN = os.environ['QUERY_VCF_SNS_TOPIC_ARN']
@@ -33,17 +29,8 @@ def get_translated_regions(location):
     return vcf_regions
 
 
-def sns_publish(topic_arn, message):
-    kwargs = {
-        'TopicArn': topic_arn,
-        'Message': json.dumps(message, separators=(',', ':')),
-    }
-    print(f"Publishing to SNS: {json.dumps(kwargs)}")
-    sns.publish(**kwargs)
-
-
 def lambda_handler(event, _):
-    print(f"Event Received: {json.dumps(event)}")
+    print_event(event)
     event_body = event.get('body')
     if not event_body:
         return bad_request("No body sent with request.")
