@@ -97,8 +97,8 @@ def print_event(event, max_length=MAX_PRINT_LENGTH):
     truncated_print(f"Event Received: {json.dumps(event)}", max_length)
 
 
-def get_sns_event(event):
-    print_event(event, MAX_SNS_EVENT_PRINT_LENGTH)
+def get_sns_event(event, max_length=MAX_SNS_EVENT_PRINT_LENGTH):
+    print_event(event, max_length)
     return json.loads(event['Records'][0]['Sns']['Message'])
 
 
