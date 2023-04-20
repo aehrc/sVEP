@@ -62,25 +62,26 @@ def query_updownstream(chrom, pos, alt, transcripts):
             for item in metadata[8].split("; ")
         )
         stream_direction = get_stream_direction(pos, metadata)
-        transcript_id = info['transcript_id'].strip('"')
+        transcript_id = info.get('transcript_id', '.').strip('"')
         if stream_direction is None:
             print(f"Couldn't classify - need to check -{transcript_id}")
             results.append('')
             continue
         support_level_set = 'transcript_support_level' in info
-        transcript_biotype = info["transcript_biotype"]
+        transcript_biotype = info.get('transcript_biotype', '.')
         if not support_level_set:
             transcript_biotype = transcript_biotype.rstrip(';')
+        transcript_version = info.get('transcript_version', '.').strip('"')
         fields = [
             '24',
             '.',
             f'{chrom}:{pos}-{pos}',
             alt,
             f'{stream_direction}stream_gene_variant',
-            info['gene_name'].strip('"'),
-            info['gene_id'].strip('"'),
+            info.get('gene_name', '.').strip('"'),
+            info.get('gene_id').strip('"'),
             metadata[2],
-            transcript_id + '.' + info['transcript_version'].strip('"'),
+            f'{transcript_id}.{transcript_version}',
             transcript_biotype.strip('"'),
             '-',
             '-',
@@ -89,7 +90,8 @@ def query_updownstream(chrom, pos, alt, transcripts):
         ]
         if support_level_set:
             fields.append(
-                info['transcript_support_level'].rstrip(';').strip('"'))
+                info.get('transcript_support_level',
+                         '.').rstrip(';').strip('"'))
         results.append('\t'.join(fields))
     return '\n'.join(results)
 
