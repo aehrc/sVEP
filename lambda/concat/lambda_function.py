@@ -19,6 +19,8 @@ os.environ['PATH'] += f':{os.environ["LAMBDA_TASK_ROOT"]}'
 
 def publish_result(api_id, batch_id):
     pre = f'{api_id}_{batch_id}'
+    # TODO: We shouldn't need this if all temp files are created and
+    #       deleted properly
     response = s3.list_objects_v2(Bucket=SVEP_REGIONS, Prefix=pre)
     if len(response['Contents']) == 2:
         page_num = 0
@@ -58,7 +60,7 @@ def publish_result(api_id, batch_id):
 
 
 def query_dataset(api_id, batch_id):
-    objs = s3.list_objects(Bucket=SVEP_TEMP)
+    objs = s3.list_objects(Bucket=SVEP_TEMP, prefix=api_id)
     if 'Contents' in objs:
         print("resending for concat")
         resend_to_concat(api_id, batch_id)
