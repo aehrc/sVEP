@@ -39,7 +39,6 @@ def submit_query_gtf(query_process, request_id, region_id, last_batch,
         for x in range(0, len(regions_list), RECORDS_PER_SAMPLE)
     ]
 
-    print(f"length = {len(total_coords)}")
     final_data = len(total_coords) - 1
     for idx in range(len(total_coords)):
         is_last = (idx == final_data) and last_batch
