@@ -78,6 +78,17 @@ resource "aws_lambda_permission" "SNSLambdaconcat" {
 }
 
 #
+# concatStarter Lambda Function
+#
+resource "aws_lambda_permission" "SNSLambdaconcatStarter" {
+  statement_id = "SNSLambdaconcatStarter"
+  action = "lambda:InvokeFunction"
+  function_name = module.lambda-concatStarter.function_name
+  principal = "sns.amazonaws.com"
+  source_arn = aws_sns_topic.concatStarter.arn
+}
+
+#
 # createPages Lambda Function
 #
 resource "aws_lambda_permission" "SNSLambdacreatePages" {

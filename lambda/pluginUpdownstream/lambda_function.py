@@ -8,7 +8,7 @@ from lambda_utils import download_vcf, get_sns_event, sns_publish, s3
 
 # Environment variables
 SVEP_TEMP = os.environ['SVEP_TEMP']
-CONCAT_SNS_TOPIC_ARN = os.environ['CONCAT_SNS_TOPIC_ARN']
+CONCAT_STARTER_SNS_TOPIC_ARN = os.environ['CONCAT_STARTER_SNS_TOPIC_ARN']
 REFERENCE_GENOME = os.environ['REFERENCE_GENOME']
 SVEP_REGIONS = os.environ['SVEP_REGIONS']
 os.environ['PATH'] += f':{os.environ["LAMBDA_TASK_ROOT"]}'
@@ -161,7 +161,7 @@ def lambda_handler(event, _):
     print("deleted")
     if last_batch:
         print("sending for concat")
-        sns_publish(CONCAT_SNS_TOPIC_ARN, {
+        sns_publish(CONCAT_STARTER_SNS_TOPIC_ARN, {
             'APIid': api_id,
             'lastBatchID': batch_id,
         })

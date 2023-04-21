@@ -142,7 +142,7 @@ data "aws_iam_policy_document" "lambda-pluginUpdownstream" {
       "SNS:Publish",
     ]
     resources = [
-      aws_sns_topic.concat.arn,
+      aws_sns_topic.concatStarter.arn,
     ]
   }
 
@@ -154,11 +154,34 @@ data "aws_iam_policy_document" "lambda-pluginUpdownstream" {
 data "aws_iam_policy_document" "lambda-concat" {
   statement {
     actions = [
-      "s3:GetObject",
       "s3:ListBucket",
-      "s3:PutObject",
     ]
-    resources = ["*"]
+    resources = [
+      aws_s3_bucket.svep-regions.arn,
+    ]
+  }
+  statement {
+    actions = [
+      "SNS:Publish",
+    ]
+    resources = [
+      aws_sns_topic.createPages.arn,
+    ]
+  }
+}
+
+#
+# concatStarter Lambda Function
+#
+data "aws_iam_policy_document" "lambda-concatStarter" {
+  statement {
+    actions = [
+      "s3:ListBucket",
+    ]
+    resources = [
+      aws_s3_bucket.svep-regions.arn,
+      aws_s3_bucket.svep-temp.arn,
+    ]
   }
   statement {
     actions = [
@@ -166,7 +189,7 @@ data "aws_iam_policy_document" "lambda-concat" {
     ]
     resources = [
       aws_sns_topic.concat.arn,
-      aws_sns_topic.createPages.arn,
+      aws_sns_topic.concatStarter.arn,
     ]
   }
 }

@@ -58,6 +58,16 @@ resource "aws_sns_topic_subscription" "concat" {
   endpoint = module.lambda-concat.function_arn
 }
 
+resource "aws_sns_topic" "concatStarter" {
+  name = "concatStarter"
+}
+
+resource "aws_sns_topic_subscription" "concatStarter" {
+  topic_arn = aws_sns_topic.concatStarter.arn
+  protocol = "lambda"
+  endpoint = module.lambda-concatStarter.function_arn
+}
+
 resource "aws_sns_topic" "createPages" {
   name = "createPages"
 }

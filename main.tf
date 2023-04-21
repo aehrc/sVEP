@@ -165,7 +165,7 @@ module "lambda-pluginUpdownstream" {
       SVEP_TEMP = aws_s3_bucket.svep-temp.bucket
       REFERENCE_GENOME = "transcripts_Homo_sapiens.GRCh38.109.chr.gtf.gz"
       SVEP_REGIONS = aws_s3_bucket.svep-regions.bucket
-      CONCAT_SNS_TOPIC_ARN = aws_sns_topic.concat.arn
+      CONCAT_STARTER_SNS_TOPIC_ARN = aws_sns_topic.concatStarter.arn
     }
   }
 }
@@ -177,7 +177,7 @@ module "lambda-concat" {
   source = "github.com/bhosking/terraform-aws-lambda"
 
   function_name = "concat"
-  description = "validates all processing is done and triggers createPages."
+  description = "Triggers createPages."
   handler = "lambda_function.lambda_handler"
   runtime = "python3.9"
   memory_size = 2048
@@ -190,10 +190,36 @@ module "lambda-concat" {
 
   environment ={
     variables = {
+      SVEP_REGIONS = aws_s3_bucket.svep-regions.bucket
+      CREATEPAGES_SNS_TOPIC_ARN = aws_sns_topic.createPages.arn
+    }
+  }
+}
+
+#
+# concatStarter Lambda Function
+#
+module "lambda-concatStarter" {
+  source = "github.com/bhosking/terraform-aws-lambda"
+
+  function_name = "concatStarter"
+  description = "Validates all processing is done and triggers concat"
+  handler = "lambda_function.lambda_handler"
+  runtime = "python3.9"
+  memory_size = 128
+  timeout = 28
+  policy = {
+    json = data.aws_iam_policy_document.lambda-concatStarter.json
+  }
+  source_path = "${path.module}/lambda/concatStarter"
+  #tags = var.common-tags
+
+  environment ={
+    variables = {
       SVEP_TEMP = aws_s3_bucket.svep-temp.bucket
       SVEP_REGIONS = aws_s3_bucket.svep-regions.bucket
       CONCAT_SNS_TOPIC_ARN = aws_sns_topic.concat.arn
-      CREATEPAGES_SNS_TOPIC_ARN = aws_sns_topic.createPages.arn
+      CONCAT_STARTER_SNS_TOPIC_ARN = aws_sns_topic.concatStarter.arn
     }
   }
 }
