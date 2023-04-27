@@ -13,6 +13,7 @@ data "aws_iam_policy_document" "main-apigateway" {
   }
 }
 
+# TODO: Restrict the resources on these policies
 #
 # initQuery Lambda Function
 #
@@ -22,7 +23,16 @@ data "aws_iam_policy_document" "lambda-initQuery" {
       "SNS:Publish",
     ]
     resources = [
+      aws_sns_topic.concatStarter.arn,
       aws_sns_topic.queryVCF.arn,
+    ]
+  }
+  statement {
+    actions = [
+      "s3:PutObject",
+    ]
+    resources = [
+      "${aws_s3_bucket.svep-temp.arn}/*",
     ]
   }
   statement {
@@ -49,9 +59,17 @@ data "aws_iam_policy_document" "lambda-queryVCF" {
   }
   statement {
     actions = [
+      "s3:PutObject",
+      "s3:DeleteObject",
+    ]
+    resources = [
+      "${aws_s3_bucket.svep-temp.arn}/*",
+    ]
+  }
+  statement {
+    actions = [
       "s3:GetObject",
       "s3:ListBucket",
-      "s3:PutObject",
     ]
     resources = ["*"]
   }
@@ -71,11 +89,12 @@ data "aws_iam_policy_document" "lambda-queryVCFsubmit" {
   }
   statement {
     actions = [
-      "s3:GetObject",
-      "s3:ListBucket",
       "s3:PutObject",
+      "s3:DeleteObject",
     ]
-    resources = ["*"]
+    resources = [
+      "${aws_s3_bucket.svep-temp.arn}/*",
+    ]
   }
 }
 
@@ -96,10 +115,17 @@ data "aws_iam_policy_document" "lambda-queryGTF" {
   }
   statement {
     actions = [
-      "s3:GetObject",
-      "s3:ListBucket",
       "s3:PutObject",
       "s3:DeleteObject",
+    ]
+    resources = [
+      "${aws_s3_bucket.svep-temp.arn}/*",
+    ]
+  }
+  statement {
+    actions = [
+      "s3:GetObject",
+      "s3:ListBucket",
     ]
     resources = ["*"]
   }
@@ -137,15 +163,6 @@ data "aws_iam_policy_document" "lambda-pluginUpdownstream" {
     ]
     resources = ["*"]
   }
-  statement {
-    actions = [
-      "SNS:Publish",
-    ]
-    resources = [
-      aws_sns_topic.concatStarter.arn,
-    ]
-  }
-
 }
 
 #

@@ -18,20 +18,12 @@ SVEP_REGIONS = os.environ['SVEP_REGIONS']
 SVEP_TEMP = os.environ['SVEP_TEMP']
 
 
-def ready_for_concat(api_id, batch_id):
+def ready_for_concat(api_id):
     objs = s3.list_objects(Bucket=SVEP_TEMP, Prefix=api_id)
-    if 'Contents' not in objs:
-        pre = f'{api_id}_{batch_id}'
-        # TODO: We shouldn't need this if all temp files are created and
-        #       deleted properly
-        response = s3.list_objects_v2(Bucket=SVEP_REGIONS, Prefix=pre)
-        if len(response['Contents']) == 2:
-            return True
-        print("No temporary files, but batch is not yet complete.")
-    return False
+    return 'Contents' not in objs
 
 
-def wait(api_id, batch_id, time_started):
+def wait(api_id, time_started):
     time_waited = time.time() - time_started
     if time_waited >= MAX_WAIT_TIME:
         print(f"Waited {time_waited} seconds. Giving up.")
@@ -39,7 +31,6 @@ def wait(api_id, batch_id, time_started):
     time.sleep(LIST_INTERVAL)
     message = {
         'APIid': api_id,
-        'lastBatchID': batch_id,
         'timeStarted': time_started,
     }
     sns_publish(CONCAT_STARTER_SNS_TOPIC_ARN, message)
@@ -50,11 +41,10 @@ def wait(api_id, batch_id, time_started):
 def lambda_handler(event, _):
     message = get_sns_event(event)
     api_id = message['APIid']
-    batch_id = message['lastBatchID']
     time_started = message.get('timeStarted', time.time())
-    if ready_for_concat(api_id, batch_id):
+    if ready_for_concat(api_id):
         sns_publish(CONCAT_SNS_TOPIC_ARN, {
             'APIid': api_id,
         })
     else:
-        wait(api_id, batch_id, time_started)
+        wait(api_id, time_started)

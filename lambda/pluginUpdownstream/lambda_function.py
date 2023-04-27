@@ -3,12 +3,10 @@ import re
 import shlex
 import subprocess
 
-from lambda_utils import download_vcf, get_sns_event, sns_publish, s3
+from lambda_utils import download_vcf, Orchestrator, s3
 
 
 # Environment variables
-SVEP_TEMP = os.environ['SVEP_TEMP']
-CONCAT_STARTER_SNS_TOPIC_ARN = os.environ['CONCAT_STARTER_SNS_TOPIC_ARN']
 REFERENCE_GENOME = os.environ['REFERENCE_GENOME']
 SVEP_REGIONS = os.environ['SVEP_REGIONS']
 os.environ['PATH'] += f':{os.environ["LAMBDA_TASK_ROOT"]}'
@@ -106,12 +104,9 @@ def strict_split(item):
 
 
 def lambda_handler(event, _):
-    message = get_sns_event(event)
+    orchestrator = Orchestrator(event)
+    message = orchestrator.message
     sns_data = message['snsData']
-    api_id = message['APIid']
-    batch_id = message['batchID']
-    temp_file_name = message['tempFileName']
-    last_batch = message['lastBatch']
     write_data = []
 
     for row in sns_data:
@@ -148,20 +143,11 @@ def lambda_handler(event, _):
                                          list(set(transcripts)))
         if results:
             write_data.append(results)
-    filename = f'/tmp/{api_id}_upstream.tsv'
-    print(batch_id)
+    base_filename = orchestrator.temp_file_name
+    filename = f'/tmp/{base_filename}.tsv'
     with open(filename, 'w') as tsv_file:
         tsv_file.write('\n'.join(write_data))
     s3.Bucket(SVEP_REGIONS).upload_file(
-        filename, f'{api_id}_{batch_id}_updownstream.tsv')
+        filename, f'{base_filename}.tsv')
     print("uploaded")
-    # After processing all the results delete the placeholder temp file
-    # from SVEP_TEMP bucket
-    s3.Object(SVEP_TEMP, temp_file_name).delete()
-    print("deleted")
-    if last_batch:
-        print("sending for concat")
-        sns_publish(CONCAT_STARTER_SNS_TOPIC_ARN, {
-            'APIid': api_id,
-            'lastBatchID': batch_id,
-        })
+    orchestrator.mark_completed()

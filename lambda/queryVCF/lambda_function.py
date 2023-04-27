@@ -1,11 +1,10 @@
 import os
 import subprocess
 
-from lambda_utils import create_temp_file, get_sns_event, sns_publish, Timer
+from lambda_utils import Orchestrator, start_function, Timer
 
 
 # Environment variables
-SVEP_TEMP = os.environ['SVEP_TEMP']
 QUERY_GTF_SNS_TOPIC_ARN = os.environ['QUERY_GTF_SNS_TOPIC_ARN']
 QUERY_VCF_SNS_TOPIC_ARN = os.environ['QUERY_VCF_SNS_TOPIC_ARN']
 QUERY_VCF_SUBMIT_SNS_TOPIC_ARN = os.environ['QUERY_VCF_SUBMIT_SNS_TOPIC_ARN']
@@ -31,73 +30,69 @@ def get_query_process(location, chrom, start, end):
                             encoding='ascii')
 
 
-def submit_query_gtf(query_process, request_id, region_id, last_batch,
-                     timer):
+def submit_query_gtf(query_process, base_id, timer):
     regions_list = query_process.stdout.read().splitlines()
     total_coords = [
         regions_list[x:x+RECORDS_PER_SAMPLE]
         for x in range(0, len(regions_list), RECORDS_PER_SAMPLE)
     ]
 
-    final_data = len(total_coords) - 1
     for idx in range(len(total_coords)):
-        is_last = (idx == final_data) and last_batch
-        batch_id = f'{region_id}_{idx}'
-        if is_last:
-            print("last Batch")
+        idx_base_id = f'{base_id}_{idx}'
         if timer.out_of_time():
             # Call self with remaining data
             remaining_coords = total_coords[idx:]
-            print(f"remaining Coords length {len(remaining_coords)}")
+            print(f"remaining coords length {len(remaining_coords)}")
             # Since coords are generally similar size because it's
             # made of chr, loc, ref, alt - we know 10 batches of 700
             # records can be handled by SNS
             for i in range(0, len(remaining_coords), BATCH_CHUNK_SIZE):
-                sns_publish(QUERY_VCF_SUBMIT_SNS_TOPIC_ARN, {
-                    'coords': remaining_coords[i:i+BATCH_CHUNK_SIZE],
-                    'requestID': request_id,
-                    'batchID': f'{batch_id}_sns{i}',
-                    # The choice of lastBatch is arbitrary in this
-                    # case, so we'll just mark the first one as it's
-                    # quicker to check.
-                    'lastBatch': (i == 0) and last_batch,
-                })
+                start_function(
+                    topic_arn=QUERY_VCF_SUBMIT_SNS_TOPIC_ARN,
+                    base_filename=f'{idx_base_id}_{i}',
+                    message={
+                        'coords': remaining_coords[i:i+BATCH_CHUNK_SIZE],
+                    },
+                )
             break
         else:
-            print(batch_id)
-            create_temp_file(SVEP_TEMP, request_id, batch_id)
-            sns_publish(QUERY_GTF_SNS_TOPIC_ARN, {
-                'coords': total_coords[idx],
-                'APIid': request_id,
-                'batchID': batch_id,
-                'lastBatch': is_last,
-            })
+            start_function(
+                topic_arn=QUERY_GTF_SNS_TOPIC_ARN,
+                base_filename=idx_base_id,
+                message={
+                    'coords': total_coords[idx],
+                },
+            )
 
 
 def lambda_handler(event, context):
-    message = get_sns_event(event)
+    orchestrator = Orchestrator(event)
+    message = orchestrator.message
     first_timer = Timer(context, MILLISECONDS_BEFORE_SPLIT)
     second_timer = Timer(context, MILLISECONDS_BEFORE_SECOND_SPLIT)
     vcf_regions = message['regions']
-    request_id = message['requestID']
     location = message['location']
-    final_data = len(vcf_regions) - 1
+    base_id = orchestrator.temp_file_name
     for index, region in enumerate(vcf_regions):
         if first_timer.out_of_time():
             new_regions = vcf_regions[index:]
             print(f"New Regions {new_regions}")
             # Publish SNS for itself!
-            sns_publish(QUERY_VCF_SNS_TOPIC_ARN, {
-                'regions': new_regions,
-                'requestID': request_id,
-                'location': location,
-            })
+            start_function(
+                topic_arn=QUERY_VCF_SNS_TOPIC_ARN,
+                base_filename=base_id,
+                message={
+                    'regions': new_regions,
+                    'location': location,
+                },
+                resend=True,
+            )
             break
         else:
             chrom, start_str = region.split(':')
-            region_id = f'{chrom}_{start_str}'
+            region_base_id = f'{base_id}_{chrom}_{start_str}'
             start = round(1000000*float(start_str) + 1)
             end = start + round(1000000*SLICE_SIZE_MBP - 1)
             query_process = get_query_process(location, chrom, start, end)
-            submit_query_gtf(query_process, request_id, region_id,
-                             int(index == final_data), second_timer)
+            submit_query_gtf(query_process, region_base_id, second_timer)
+    orchestrator.mark_completed()

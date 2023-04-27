@@ -2,11 +2,10 @@ import json
 import os
 import subprocess
 
-import lambda_utils
+from lambda_utils import download_vcf, Orchestrator, start_function, Timer
 
 
 # Environment variables
-SVEP_TEMP = os.environ['SVEP_TEMP']
 REFERENCE_GENOME = os.environ['REFERENCE_GENOME']
 PLUGIN_CONSEQUENCE_SNS_TOPIC_ARN = os.environ['PLUGIN_CONSEQUENCE_SNS_TOPIC_ARN']
 PLUGIN_UPDOWNSTREAM_SNS_TOPIC_ARN = os.environ['PLUGIN_UPDOWNSTREAM_SNS_TOPIC_ARN']
@@ -22,12 +21,11 @@ MILLISECONDS_BEFORE_SPLIT = 4000
 PAYLOAD_SIZE = 260000
 
 # Download reference genome and index
-lambda_utils.download_vcf(BUCKET_NAME, REFERENCE_GENOME)
+download_vcf(BUCKET_NAME, REFERENCE_GENOME)
 
 
-def overlap_feature(all_coords, api_id, batch_id, last_batch, timer):
+def overlap_feature(all_coords, base_id, timer):
     results = []
-    final_data = len(all_coords) - 1
     tot_size = 0
     counter = 0
     for idx, coord in enumerate(all_coords):
@@ -57,66 +55,51 @@ def overlap_feature(all_coords, api_id, batch_id, last_batch, timer):
             if timer.out_of_time():
                 # should only be executed in very few cases.
                 counter += 1
-                send_data_to_plugins(api_id, results, counter, batch_id, 0)
-                send_data_to_self(api_id, all_coords[idx:], batch_id, counter,
-                                  last_batch)
-                break
+
+                send_data_to_plugins(base_id, counter, results)
+                send_data_to_self(base_id, all_coords[idx:])
+                return
         else:
             counter += 1
-            send_data_to_plugins(api_id, results, counter, batch_id, 0)
+            send_data_to_plugins(base_id, counter, results)
             if timer.out_of_time():
-                send_data_to_self(api_id, all_coords[idx:], batch_id, counter,
-                                  last_batch)
-                break
+                send_data_to_self(base_id, all_coords[idx:])
+                return
             else:
                 results = [data]
                 tot_size = cur_size
-
-        if idx == final_data:
-            counter += 1
-            # TODO: Don't send this if we just sent because results was
-            #   full. Also make sure that previous message included
-            #   lastBatch=last_batch.
-            send_data_to_plugins(api_id, results, counter, batch_id,
-                                 last_batch)
-            lambda_utils.delete_temp_file(SVEP_TEMP, api_id, batch_id)
+    counter += 1
+    send_data_to_plugins(base_id, counter, results)
 
 
-def send_data_to_plugins(api_id, results, counter, batch_id, last_batch):
-    unique_batch_id = f'{batch_id}_{counter}'
-    print(unique_batch_id)
+def send_data_to_plugins(base_id, counter, results):
     for topic in TOPICS:
-        temp_file_name = lambda_utils.create_temp_file(SVEP_TEMP, api_id,
-                                                       unique_batch_id, topic)
-        lambda_utils.sns_publish(topic, {
-            'snsData': results,
-            'APIid': api_id,
-            'batchID': unique_batch_id,
-            'tempFileName': temp_file_name,
-            # Only one plugin, currently updownstream, should act on the
-            # lastBatch value.
-            'lastBatch': last_batch,
-        })
+        start_function(
+            topic_arn=topic,
+            base_filename=f'{base_id}_{counter}',
+            message={
+                'snsData': results,
+            },
+        )
 
 
-def send_data_to_self(api_id, remaining_coords, batch_id, counter, last_batch):
-    unique_batch_id = f'{batch_id}_GTF{counter}'
+def send_data_to_self(base_id, remaining_coords):
     print("Less Time remaining - call itself.")
-    lambda_utils.sns_publish(QUERY_GTF_SNS_TOPIC_ARN, {
-        'coords': remaining_coords,
-        'APIid': api_id,
-        'batchID': unique_batch_id,
-        'lastBatch': last_batch,
-    })
-    lambda_utils.create_temp_file(SVEP_TEMP, api_id, unique_batch_id)
-    lambda_utils.delete_temp_file(SVEP_TEMP, api_id, batch_id)
+    start_function(
+        topic_arn=QUERY_GTF_SNS_TOPIC_ARN,
+        base_filename=base_id,
+        message={
+            'coords': remaining_coords,
+        },
+        resend=True,
+    )
 
 
 def lambda_handler(event, context):
-    message = lambda_utils.get_sns_event(event)
-    timer = lambda_utils.Timer(context, MILLISECONDS_BEFORE_SPLIT)
+    orchestrator = Orchestrator(event)
+    message = orchestrator.message
+    timer = Timer(context, MILLISECONDS_BEFORE_SPLIT)
     coords = message['coords']
-    api_id = message['APIid']
-    batch_id = message['batchID']
-    last_batch = message['lastBatch']
-    overlap_feature(coords, api_id, batch_id, last_batch, timer)
+    base_id = orchestrator.temp_file_name
+    overlap_feature(coords, base_id, timer)
+    orchestrator.mark_completed()

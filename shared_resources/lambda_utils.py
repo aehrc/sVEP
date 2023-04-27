@@ -10,8 +10,12 @@ import boto3
 s3 = boto3.resource('s3')
 sns = boto3.client('sns')
 
+# Optional environment variables
+SVEP_TEMP = os.environ.get('SVEP_TEMP')
+
 MAX_PRINT_LENGTH = 1024
 MAX_SNS_EVENT_PRINT_LENGTH = 2048
+TEMP_FILE_FIELD = 'tempFileName'
 
 
 class Timer:
@@ -23,11 +27,25 @@ class Timer:
         return self.context.get_remaining_time_in_millis() <= self.buffer_time
 
 
-def _get_file_name(api_id, batch_id, suffix=None):
-    filename = f'{api_id}_{batch_id}'
-    if suffix is not None:
-        filename = f'{filename}_{suffix}'
-    return filename
+class Orchestrator:
+    def __init__(self, event):
+        self.message = get_sns_event(event)
+        self.temp_file_name = self.message[TEMP_FILE_FIELD]
+        # A flag to ensure that the temp file is deleted at the end of
+        # the function.
+        self.completed = False
+
+    def __del__(self):
+        assert self.completed, "Must call mark_completed at end of function."
+
+    def mark_completed(self):
+        print(f"Deleting file: {self.temp_file_name}")
+        s3.Object(SVEP_TEMP, self.temp_file_name).delete()
+        self.completed = True
+
+
+def _get_function_name_from_arn(arn):
+    return arn.split(':')[-1]
 
 
 def _truncate_string(string, max_length=MAX_PRINT_LENGTH):
@@ -61,12 +79,6 @@ def _truncate_string(string, max_length=MAX_PRINT_LENGTH):
     return f"{string[:snip_start]}{placeholder}{string[snip_end:]}"
 
 
-def delete_temp_file(bucket, api_id, batch_id, suffix=None):
-    filename = _get_file_name(api_id, batch_id, suffix)
-    print(f"Deleting file: {filename}")
-    s3.Object(bucket, filename).delete()
-
-
 def download_vcf(bucket, vcf):
     keys = [
         vcf,
@@ -77,11 +89,9 @@ def download_vcf(bucket, vcf):
         s3.Bucket(bucket).download_file(key, local_file_name)
 
 
-def create_temp_file(bucket, api_id, batch_id, suffix=None):
-    filename = _get_file_name(api_id, batch_id, suffix)
+def _create_temp_file(filename):
     print(f"Creating file: {filename}")
-    s3.Object(bucket, filename).put(Body=b'')
-    return filename
+    s3.Object(SVEP_TEMP, filename).put(Body=b'')
 
 
 def clear_tmp():
@@ -109,6 +119,21 @@ def sns_publish(topic_arn, message, max_length=MAX_PRINT_LENGTH):
     }
     truncated_print(f"Publishing to SNS: {json.dumps(kwargs)}", max_length)
     sns.publish(**kwargs)
+
+
+def start_function(topic_arn, base_filename, message, resend=False,
+                   max_length=MAX_PRINT_LENGTH):
+    assert TEMP_FILE_FIELD not in message
+    function_name = _get_function_name_from_arn(topic_arn)
+    if resend:
+        base_name, old_index = base_filename.rsplit(function_name, 1)
+        old_index = old_index or 0  # Account for empty string
+        filename = f'{base_name}{function_name}{int(old_index) + 1}'
+    else:
+        filename = f'{base_filename}_{function_name}'
+    message[TEMP_FILE_FIELD] = filename
+    _create_temp_file(filename)
+    sns_publish(topic_arn, message, max_length)
 
 
 def truncated_print(string, max_length=MAX_PRINT_LENGTH):

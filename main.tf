@@ -23,8 +23,10 @@ module "lambda-initQuery" {
 
   environment ={
     variables = {
+      CONCAT_STARTER_SNS_TOPIC_ARN = aws_sns_topic.concatStarter.arn
       QUERY_VCF_SNS_TOPIC_ARN = aws_sns_topic.queryVCF.arn
       SLICE_SIZE_MBP = local.slice_size_mbp
+      SVEP_TEMP = aws_s3_bucket.svep-temp.bucket
     }
   }
 }
@@ -165,7 +167,6 @@ module "lambda-pluginUpdownstream" {
       SVEP_TEMP = aws_s3_bucket.svep-temp.bucket
       REFERENCE_GENOME = "transcripts_Homo_sapiens.GRCh38.109.chr.gtf.gz"
       SVEP_REGIONS = aws_s3_bucket.svep-regions.bucket
-      CONCAT_STARTER_SNS_TOPIC_ARN = aws_sns_topic.concatStarter.arn
     }
   }
 }

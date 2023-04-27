@@ -3,10 +3,11 @@ import os
 
 from api_response import bad_request, bundle_response
 import chrom_matching
-from lambda_utils import print_event, sns_publish
+from lambda_utils import print_event, sns_publish, start_function
 
 
 # Environment variables
+CONCAT_STARTER_SNS_TOPIC_ARN = os.environ['CONCAT_STARTER_SNS_TOPIC_ARN']
 QUERY_VCF_SNS_TOPIC_ARN = os.environ['QUERY_VCF_SNS_TOPIC_ARN']
 SLICE_SIZE_MBP = int(os.environ['SLICE_SIZE_MBP'])
 os.environ['PATH'] += f':{os.environ["LAMBDA_TASK_ROOT"]}'
@@ -43,9 +44,12 @@ def lambda_handler(event, _):
         return bad_request("Error parsing request body, Expected JSON.")
 
     print(vcf_regions)
-    sns_publish(QUERY_VCF_SNS_TOPIC_ARN, {
+    start_function(QUERY_VCF_SNS_TOPIC_ARN, request_id, {
         'regions': vcf_regions,
-        'requestID': request_id,
         'location': location,
+    })
+    sns_publish(CONCAT_STARTER_SNS_TOPIC_ARN, {
+        # TODO: Change all these APIid strings to requestID
+        'APIid': request_id,
     })
     return bundle_response(200, "Process started")

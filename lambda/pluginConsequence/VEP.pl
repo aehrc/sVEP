@@ -92,11 +92,7 @@ sub handle {
     #my $id = $sns->{'MessageId'};
     my $message = decode_json($sns->{'Message'}); #might have to remove decode_json
     my @data = $message->{'snsData'};
-    my $id = $message->{'APIid'};
-    my $batchId = $message->{'batchID'};
     my $tempFileName = $message->{'tempFileName'};
-    print("APIid is - $id\n");
-    print("batchID is - $batchId\n");
     print("tempFileName is - $tempFileName\n");
     #############################################
 
@@ -120,7 +116,7 @@ sub handle {
       }
     }
     #my $filename = "/tmp/test.tsv";
-    my $filename = "/tmp/".$id."_".$batchId.".tsv";
+    my $filename = "/tmp/".$tempFileName.".tsv";
     open(my $fh, '>', $filename) or die "Could not open file '$filename' $!";
     print $fh join("\n", @results);
     close $fh;
