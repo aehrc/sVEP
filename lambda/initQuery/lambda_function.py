@@ -3,12 +3,15 @@ import os
 
 from api_response import bad_request, bundle_response
 import chrom_matching
-from lambda_utils import print_event, sns_publish, start_function
+from lambda_utils import print_event, sns_publish, start_function, generate_presigned_get_url
 
 
 # Environment variables
 CONCAT_STARTER_SNS_TOPIC_ARN = os.environ['CONCAT_STARTER_SNS_TOPIC_ARN']
 QUERY_VCF_SNS_TOPIC_ARN = os.environ['QUERY_VCF_SNS_TOPIC_ARN']
+RESULT_BUCKET = os.environ['SVEP_RESULTS']
+RESULT_DURATION = int(os.environ['RESULT_DURATION'])
+RESULT_SUFFIX = os.environ['RESULT_SUFFIX']
 SLICE_SIZE_MBP = int(os.environ['SLICE_SIZE_MBP'])
 os.environ['PATH'] += f':{os.environ["LAMBDA_TASK_ROOT"]}'
 
@@ -52,4 +55,8 @@ def lambda_handler(event, _):
         # TODO: Change all these APIid strings to requestID
         'APIid': request_id,
     })
-    return bundle_response(200, "Process started")
+    result_url = generate_presigned_get_url(RESULT_BUCKET, f'{request_id}{RESULT_SUFFIX}', RESULT_DURATION)
+    return bundle_response(200, {
+        "Response": "Process started",
+        "ResultUrl": result_url,
+    })

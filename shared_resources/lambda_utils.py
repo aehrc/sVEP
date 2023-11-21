@@ -79,6 +79,21 @@ def _truncate_string(string, max_length=MAX_PRINT_LENGTH):
     return f"{string[:snip_start]}{placeholder}{string[snip_end:]}"
 
 
+def generate_presigned_get_url(bucket, key, expires=3600):
+    kwargs = {
+        'ClientMethod': 'get_object',
+        'Params': {
+            'Bucket': bucket,
+            'Key': key,
+        },
+        'ExpiresIn': expires,
+    }
+    print(f"Calling s3.generate_presigned_url with kwargs: {json.dumps(kwargs)}")
+    response = s3.meta.client.generate_presigned_url(**kwargs)
+    print(f"Received response: {json.dumps(response, default=str)}")
+    return response
+
+
 def download_vcf(bucket, vcf):
     keys = [
         vcf,

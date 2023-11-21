@@ -1,6 +1,8 @@
 locals {
   api_version = "v1.0.0"
   slice_size_mbp = 5
+  result_suffix = "_results.tsv"
+  result_duration = 86400
 }
 
 #
@@ -25,7 +27,10 @@ module "lambda-initQuery" {
     variables = {
       CONCAT_STARTER_SNS_TOPIC_ARN = aws_sns_topic.concatStarter.arn
       QUERY_VCF_SNS_TOPIC_ARN = aws_sns_topic.queryVCF.arn
+      RESULT_DURATION = local.result_duration
+      RESULT_SUFFIX = local.result_suffix
       SLICE_SIZE_MBP = local.slice_size_mbp
+      SVEP_RESULTS = aws_s3_bucket.svep-results.bucket
       SVEP_TEMP = aws_s3_bucket.svep-temp.bucket
     }
   }
@@ -273,6 +278,7 @@ module "lambda-concatPages" {
 
   environment ={
     variables = {
+      RESULT_SUFFIX = local.result_suffix
       SVEP_REGIONS = aws_s3_bucket.svep-regions.bucket
       SVEP_RESULTS = aws_s3_bucket.svep-results.bucket
       CONCATPAGES_SNS_TOPIC_ARN = aws_sns_topic.concatPages.arn

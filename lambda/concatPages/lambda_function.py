@@ -12,6 +12,7 @@ fs = s3fs.S3FileSystem(anon=False)
 s3 = boto3.client('s3')
 
 # Environment variables
+RESULT_SUFFIX = os.environ['RESULT_SUFFIX']
 SVEP_REGIONS = os.environ['SVEP_REGIONS']
 SVEP_RESULTS = os.environ['SVEP_RESULTS']
 CONCATPAGES_SNS_TOPIC_ARN = os.environ['CONCATPAGES_SNS_TOPIC_ARN']
@@ -20,7 +21,7 @@ os.environ['PATH'] += f':{os.environ["LAMBDA_TASK_ROOT"]}'
 
 def publish_result(api_id, all_keys, last_file, page_num, prefix):
     start_time = time.time()
-    filename = f'{api_id}_results.tsv'
+    filename = f'{api_id}{RESULT_SUFFIX}'
     file_path = f's3://{SVEP_RESULTS}/{filename}'
     response = s3.list_objects_v2(Bucket=SVEP_REGIONS, Prefix=prefix)
     if len(response['Contents']) == page_num:
