@@ -10,6 +10,17 @@ resource "aws_lambda_permission" "APIinitQuery" {
 }
 
 #
+# getResultsURL Lambda Function
+#
+resource "aws_lambda_permission" "APIgetResultsURL" {
+  statement_id = "AllowgetResultsURLInvoke"
+  action = "lambda:InvokeFunction"
+  function_name = module.lambda-getResultsURL.function_name
+  principal = "apigateway.amazonaws.com"
+  source_arn = "${aws_api_gateway_rest_api.VPApi.execution_arn}/*/*/${aws_api_gateway_resource.results-url.path_part}"
+}
+
+#
 # queryVCF Lambda Function
 #
 resource "aws_lambda_permission" "SNSLambdaqueryVCF" {

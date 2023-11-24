@@ -257,3 +257,15 @@ data "aws_iam_policy_document" "lambda-concatPages" {
     ]
   }
 }
+
+#
+# getResultsURL Lambda Function
+#
+data "aws_iam_policy_document" "lambda-getResultsURL" {
+  statement {
+    actions = [
+      "s3:GetObject",
+    ]
+    resources = ["*"]
+  }
+}

@@ -2,3 +2,4 @@
 terraform.tfstate
 .git
 .idea/
+.DS_Store

@@ -1,3 +1,7 @@
+provider "aws" {
+  region = "ap-southeast-2"
+}
+
 locals {
   api_version = "v1.0.0"
   slice_size_mbp = 5
@@ -282,6 +286,33 @@ module "lambda-concatPages" {
       SVEP_REGIONS = aws_s3_bucket.svep-regions.bucket
       SVEP_RESULTS = aws_s3_bucket.svep-results.bucket
       CONCATPAGES_SNS_TOPIC_ARN = aws_sns_topic.concatPages.arn
+    }
+  }
+}
+
+#
+# getResultsURL Lambda Function
+#
+module "lambda-getResultsURL" {
+  source = "github.com/bhosking/terraform-aws-lambda"
+
+  function_name = "getResultsURL"
+  description = "Returns the presigned results URL for results"
+  handler = "lambda_function.lambda_handler"
+  runtime = "python3.9"
+  memory_size = 1792
+  timeout = 28
+  policy = {
+    json = data.aws_iam_policy_document.lambda-getResultsURL.json
+  }
+  source_path = "${path.module}/lambda/getResultsURL"
+  #tags = var.common-tags
+
+  environment ={
+    variables = {
+      RESULT_DURATION = local.result_duration
+      RESULT_SUFFIX = local.result_suffix
+      SVEP_RESULTS = aws_s3_bucket.svep-results.bucket
     }
   }
 }

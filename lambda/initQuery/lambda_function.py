@@ -3,7 +3,7 @@ import os
 
 from api_response import bad_request, bundle_response
 import chrom_matching
-from lambda_utils import print_event, sns_publish, start_function, generate_presigned_get_url
+from lambda_utils import print_event, sns_publish, start_function
 
 
 # Environment variables
@@ -55,8 +55,8 @@ def lambda_handler(event, _):
         # TODO: Change all these APIid strings to requestID
         'APIid': request_id,
     })
-    result_url = generate_presigned_get_url(RESULT_BUCKET, f'{request_id}{RESULT_SUFFIX}', RESULT_DURATION)
+
     return bundle_response(200, {
         "Response": "Process started",
-        "ResultUrl": result_url,
+        "RequestId": request_id,
     })
