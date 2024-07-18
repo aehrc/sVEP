@@ -1,72 +1,53 @@
-import datetime
-import json
 import os
-import subprocess
-import time
+
 import boto3
 
-CONCAT_SNS_TOPIC_ARN = os.environ['CONCAT_SNS_TOPIC_ARN']
-DATASETS_TABLE_NAME = os.environ['DATASETS_TABLE']
-SVEP_REGIONS = os.environ['SVEP_REGIONS']
-SVEP_RESULTS = os.environ['SVEP_RESULTS']
-os.environ['PATH'] += ':' + os.environ['LAMBDA_TASK_ROOT']
+from lambda_utils import get_sns_event, sns_publish
+
+
+# AWS clients and resources
 s3 = boto3.client('s3')
-s3Obj = boto3.resource('s3')
-dynamodb = boto3.client('dynamodb')
-sns = boto3.client('sns')
+
+# Environment variables
+CREATEPAGES_SNS_TOPIC_ARN = os.environ['CREATEPAGES_SNS_TOPIC_ARN']
+SVEP_REGIONS = os.environ['SVEP_REGIONS']
 
 
-def publishResult(numFiles, APIid, batchID):
-    filename = APIid+"_results.tsv"
-    bucket = s3Obj.Bucket(SVEP_REGIONS)
-    files =[]
-    content = []
-    for key in s3.list_objects(Bucket=SVEP_REGIONS)['Contents']:
-        if(key['Key'].startswith(APIid)):
-            files.append(key['Key'])
-    if(numFiles == len(files)):
-        for obj in bucket.objects.filter(Prefix=APIid):
-            body = obj.get()['Body'].read()
-            content.append(body)
-
-        s3Obj.Object(SVEP_RESULTS, filename).put(Body=(b"\n".join(content)))
-        #with open("/tmp/merge.tsv", 'w') as tsvfile:
-        #    tsvfile.write("\n".join(content))
-
-        #s3Obj.Bucket(SVEP_RESULTS).upload_file("/tmp/merge.tsv", filename)
-    else:
-        print("resending for concat")
-        kwargs = {
-            'TopicArn': CONCAT_SNS_TOPIC_ARN,
+def concat(api_id):
+    page_num = 0
+    paginator = s3.get_paginator('list_objects_v2')
+    # Change later on
+    operation_parameters = {
+        'Bucket': SVEP_REGIONS,
+        'Prefix': api_id,
+        'PaginationConfig': {
+            'PageSize': 600
         }
-        kwargs['Message'] = json.dumps({'APIid' : APIid,'lastBatchID' : batchID})
-        print('Publishing to SNS: {}'.format(json.dumps(kwargs)))
-        response = sns.publish(**kwargs)
-        print('Received Response: {}'.format(json.dumps(response)))
-
-
-def queryDataset(APIid,batchID):
-    kwargs = {
-        'TableName': DATASETS_TABLE_NAME,
-        'Key': {
-            'APIid': {
-                'S': APIid,
-            },
-        },
     }
-    response = dynamodb.get_item(**kwargs)
-    numFiles = int(response['Item']['filesCount']['N'])
-    publishResult(numFiles, APIid, batchID)
+    page_iterator = paginator.paginate(**operation_parameters)
+    message = {
+        'APIid': api_id,
+        'prefix': f'{api_id}_page',
+    }
+    for page in page_iterator:
+        page_contents = page['Contents']
+        page_keys = [d['Key'] for d in page_contents]
+        page_num += 1
+        message.update({
+            'pageKeys': page_keys,
+            'pageNum': page_num,
+        })
+        if 'NextContinuationToken' in page:
+            message['lastPage'] = 0
+        else:
+            print("last page")
+            print(page_num)
+            message['lastPage'] = 1
+        sns_publish(CREATEPAGES_SNS_TOPIC_ARN, message)
+    print("Finished sending to createPages")
 
 
-
-def lambda_handler(event, context):
-    print('Event Received: {}'.format(json.dumps(event)))
-    ################test#################
-    #message = json.loads(event['Message'])
-    #######################################
-    message = json.loads(event['Records'][0]['Sns']['Message'])
-    APIid = message['APIid']
-    batchID = message['lastBatchID']
-    #time.sleep(8)
-    queryDataset(APIid,batchID)
+def lambda_handler(event, _):
+    message = get_sns_event(event)
+    api_id = message['APIid']
+    concat(api_id)

@@ -658,6 +658,7 @@ our %OVERLAP_CONSEQUENCES = (
   'feature_class' => 'consequence::Transcript',
   'impact' => 'MODIFIER',
   'include' => {
+                 'nonsense_mediated_decay' => 0,
                  'protein_coding' => 0,
                  'within_feature' => 1
                },
@@ -810,6 +811,25 @@ our %OVERLAP_CONSEQUENCES = (
   'variant_feature_class' => 'consequence::BaseVariationFeature'
 }
 ),
+'intron_variant' => consequence::OverlapConsequence->new_fast({
+  'NCBI_term' => 'intron',
+  'SO_accession' => 'SO:0001627',
+  'SO_term' => 'intron_variant',
+  'description' => 'A transcript variant occurring within an intron',
+  'display_term' => 'INTRONIC',
+  'feature_SO_term' => 'primary_transcript',
+  'feature_class' => 'consequence::Transcript',
+  'impact' => 'MODIFIER',
+  'include' => {
+                 'intron' => 1
+               },
+  'label' => 'intron variant',
+  'predicate' => 'consequence::VariationEffect::within_intron',
+  'rank' => '21',
+  'tier' => '3',
+  'variant_feature_class' => 'consequence::BaseVariationFeature'
+}
+),
 'TFBS_amplification' => consequence::OverlapConsequence->new_fast({
   'SO_accession' => 'SO:0001892',
   'SO_term' => 'TFBS_amplification',
@@ -899,40 +919,7 @@ our %OVERLAP_CONSEQUENCES = (
   'tier' => '3',
   'variant_feature_class' => 'consequence::BaseVariationFeature'
 }
-),
-'protein_altering_variant' => consequence::OverlapConsequence->new_fast({
-  'SO_accession' => 'SO:0001818',
-  'SO_term' => 'protein_altering_variant',
-  'description' => 'A sequence_variant which is predicted to change the protein encoded in the coding sequence',
-  'feature_SO_term' => 'mRNA',
-  'feature_class' => 'consequence::Transcript',
-  'impact' => 'MODERATE',
-  'include' => {
-                 'coding' => 1
-               },
-  'label' => 'protein altering variant',
-  'predicate' => 'consequence::VariationEffect::protein_altering_variant',
-  'rank' => '12',
-  'tier' => '3',
-  'variant_feature_class' => 'consequence::VariationFeature'
-}
-),
-);
-
-our $SO_ACC_MAPPER = {
-  'Bio::EnsEMBL::Variation::StructuralVariationFeature' => {
-                                                             'acc' => 'SO:0001537',
-                                                             'term' => 'structural_variant'
-                                                           },
-  'consequence::VariationFeature' => {
-                                                   'acc' => 'SO:0001060',
-                                                   'term' => 'sequence_variant'
-                                                 }
-}
-;
-
-=head2 addLater
-'splice_donor_variant' => consequence::OverlapConsequence->new_fast({
+),'splice_donor_variant' => consequence::OverlapConsequence->new_fast({
   'NCBI_term' => 'splice-5',
   'SO_accession' => 'SO:0001575',
   'SO_term' => 'splice_donor_variant',
@@ -988,26 +975,38 @@ our $SO_ACC_MAPPER = {
   'variant_feature_class' => 'consequence::VariationFeature'
 }
 ),
-'intron_variant' => consequence::OverlapConsequence->new_fast({
-  'NCBI_term' => 'intron',
-  'SO_accession' => 'SO:0001627',
-  'SO_term' => 'intron_variant',
-  'description' => 'A transcript variant occurring within an intron',
-  'display_term' => 'INTRONIC',
-  'feature_SO_term' => 'primary_transcript',
+'protein_altering_variant' => consequence::OverlapConsequence->new_fast({
+  'SO_accession' => 'SO:0001818',
+  'SO_term' => 'protein_altering_variant',
+  'description' => 'A sequence_variant which is predicted to change the protein encoded in the coding sequence',
+  'feature_SO_term' => 'mRNA',
   'feature_class' => 'consequence::Transcript',
-  'impact' => 'MODIFIER',
+  'impact' => 'MODERATE',
   'include' => {
-                 'intron' => 1
+                 'coding' => 1
                },
-  'label' => 'intron variant',
-  'predicate' => 'consequence::VariationEffect::within_intron',
-  'rank' => '21',
+  'label' => 'protein altering variant',
+  'predicate' => 'consequence::VariationEffect::protein_altering_variant',
+  'rank' => '12',
   'tier' => '3',
-  'variant_feature_class' => 'consequence::BaseVariationFeature'
+  'variant_feature_class' => 'consequence::VariationFeature'
 }
 ),
-=cut
+);
+
+our $SO_ACC_MAPPER = {
+  'Bio::EnsEMBL::Variation::StructuralVariationFeature' => {
+                                                             'acc' => 'SO:0001537',
+                                                             'term' => 'structural_variant'
+                                                           },
+  'consequence::VariationFeature' => {
+                                                   'acc' => 'SO:0001060',
+                                                   'term' => 'sequence_variant'
+                                                 }
+}
+;
+
+
 
 
 1;

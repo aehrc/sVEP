@@ -306,6 +306,24 @@ sub strand {
 
   return $self->{'strand'};
 }
+sub exon {
+  my ($self, $value ) = @_;
+
+  if( defined $value ) {
+    $self->{'exon'} = $value;
+  }
+
+  return $self->{'exon'};
+}
+sub intron {
+  my ($self, $value ) = @_;
+
+  if( defined $value ) {
+    $self->{'intron'} = $value;
+  }
+
+  return $self->{'intron'};
+}
 
 sub get_all_TranscriptVariations {
 

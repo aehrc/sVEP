@@ -46,7 +46,8 @@ def get_vcf_chromosomes(vcf):
         '--list-chroms',
         vcf
     ]
-    tabix_output = subprocess.check_output(args=args, cwd='/tmp', encoding='utf-8')
+    tabix_output = subprocess.check_output(args=args, cwd='/tmp',
+                                           encoding='utf-8')
     clear_tmp()
     return tabix_output.split('\n')[:-1]
 
@@ -58,6 +59,18 @@ def get_matching_chromosome(vcf_chromosomes, target_chromosome):
     return None
 
 
+def get_regions(slice_size_mbp):
+    regions = {}
+    for chrom, size in CHROMOSOME_LENGTHS_MBP.items():
+        chrom_regions = []
+        start = 0
+        while start < size:
+            chrom_regions.append(start)
+            start += slice_size_mbp
+        regions[chrom] = chrom_regions
+    return regions
+
+
 def _match_chromosome_name(chromosome_name):
     for i in range(len(chromosome_name)):
         chrom = chromosome_name[i:]  # progressively remove prefix
@@ -65,6 +78,5 @@ def _match_chromosome_name(chromosome_name):
             return chrom
         elif chrom in CHROMOSOME_ALIASES:
             return CHROMOSOME_ALIASES[chrom]
-    print('WARNING: Could not find chromosome to match "{}"'.format(chromosome_name))
+    print(f'WARNING: Could not find chromosome to match "{chromosome_name}"')
     return None
-
