@@ -27,7 +27,6 @@ resource "aws_sns_topic_subscription" "queryGTF" {
   endpoint = module.lambda-queryGTF.function_arn
 }
 
-
 resource "aws_sns_topic" "pluginConsequence" {
   name = "pluginConsequence"
 }
@@ -35,7 +34,8 @@ resource "aws_sns_topic" "pluginConsequence" {
 resource "aws_sns_topic_subscription" "pluginConsequence" {
   topic_arn = aws_sns_topic.pluginConsequence.arn
   protocol = "lambda"
-  endpoint = module.lambda-pluginConsequence.function_arn
+  # TODO: Reference function_arn once the module source is updated
+  endpoint = module.lambda-pluginConsequence.lambda_function_arn
 }
 
 resource "aws_sns_topic" "pluginUpdownstream" {

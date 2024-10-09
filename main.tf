@@ -1,6 +1,4 @@
-provider "aws" {
-  region = "ap-southeast-2"
-}
+data "aws_caller_identity" "this" {}
 
 locals {
   api_version = "v1.0.0"
@@ -123,35 +121,33 @@ module "lambda-queryGTF" {
   }
 }
 
-
 #
 # pluginConsequence Lambda Function
 #
+# TODO: update source to github.com/bhosking/terraform-aws-lambda once docker support is added
 module "lambda-pluginConsequence" {
-  source = "github.com/bhosking/terraform-aws-lambda"
-  function_name = "pluginConsequence"
+  source = "terraform-aws-modules/lambda/aws"
+
+  function_name      = "pluginConsequence"
   description = "Queries VCF for a specified variant."
-  handler = "VEP.handle"
-  runtime = "provided"
+  create_package = false
+  image_uri = module.docker_image_pluginConsequence_lambda.image_uri
+  package_type = "Image"
   memory_size = 2048
-  timeout = 24
-  policy = {
-    json = data.aws_iam_policy_document.lambda-pluginConsequence.json
-  }
+  timeout = 60
+  attach_policy_jsons = true
+  policy_jsons = [
+    data.aws_iam_policy_document.lambda-pluginConsequence.json
+  ]
+  number_of_policy_jsons = 1
   source_path = "${path.module}/lambda/pluginConsequence"
   #tags = var.common-tags
-  layers =[
-    "arn:aws:lambda:ap-southeast-2:445285296882:layer:perl-5-30-runtime:5",
-    "arn:aws:lambda:ap-southeast-2:132838717167:layer:serverlessrepo-lambda-layer-awscli:1"
-  ]
-  environment ={
-    variables = {
+  environment_variables = {
       SVEP_TEMP = aws_s3_bucket.svep-temp.bucket
       SVEP_REGIONS = aws_s3_bucket.svep-regions.bucket
       REFERENCE_LOCATION = "s3://svep/"
       SPLICE_REFERENCE = "sorted_splice_GRCh38.109.gtf.gz"
       MIRNA_REFERENCE = "sorted_filtered_mirna.gff3.gz" 
-    }
   }
 }
 

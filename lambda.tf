@@ -72,12 +72,14 @@ resource "aws_lambda_function_recursion_config" "SNSLambdaqueryGTF" {
 resource "aws_lambda_permission" "SNSLambdapluginConsequence" {
   statement_id = "SNSLambdapluginConsequence"
   action = "lambda:InvokeFunction"
-  function_name = module.lambda-pluginConsequence.function_name
+  # TODO: Update to reference function_name once terraform-aws-lambda is updated
+  function_name = module.lambda-pluginConsequence.lambda_function_name
   principal = "sns.amazonaws.com"
   source_arn = aws_sns_topic.pluginConsequence.arn
 }
 resource "aws_lambda_function_recursion_config" "SNSLambdapluginConsequence" {
-  function_name = module.lambda-pluginConsequence.function_name
+  # TODO: Update to reference function_name once terraform-aws-lambda is updated
+  function_name = module.lambda-pluginConsequence.lambda_function_name
   recursive_loop = "Allow"
 }
 

@@ -47,6 +47,7 @@ Bio::EnsEMBL::Variation::Utils::VEP - Methods used by the Variant Effect Predict
 
 =cut
 
+package VEP;
 
 use strict;
 use warnings;
@@ -80,16 +81,10 @@ my $mirnaFile =  $ENV{'MIRNA_REFERENCE'};
 my $outputLocation =  $ENV{'SVEP_REGIONS'};
 my $tempLocation =  $ENV{'SVEP_TEMP'};
 sub handle {
-    my ($payload, $context) = @_;
-    #print Dumper $payload;
-    #my @data = decode_json($payload->{'Message'}); # This line is for individual lambda testing
-    #my $data = decode_json($payload->{'Message'});
-    #event['Records'][0]['Sns']['Message']
-    my $event = $payload->{'Records'}[0];
-    my $sns = $event->{'Sns'};
+    my ($payload) = @_;
+    my $event = decode_json($payload);
+    my $sns = $event->{Records}[0]{Sns};
     ##########################################update
-    #my @data = decode_json($sns->{'Message'});
-    #my $id = $sns->{'MessageId'};
     my $message = decode_json($sns->{'Message'}); #might have to remove decode_json
     my @data = $message->{'snsData'};
     my $tempFileName = $message->{'tempFileName'};
@@ -100,8 +95,8 @@ sub handle {
     my $chr = $data[0][0]->{'chrom'};
     #print($chr);
     my $fasta ='Homo_sapiens.GRCh38.dna.chromosome.'.$chr.'.fa.gz';
-    system("/opt/awscli/aws s3 cp $fastaLocation /tmp/ --recursive  --exclude '*'  --include '$fasta*'");
-    system("/opt/awscli/aws s3 cp $fastaLocation /tmp/ --recursive  --exclude '*'  --include '$spliceFile*'");
+    system("/usr/bin/aws s3 cp $fastaLocation /tmp/ --recursive  --exclude '*'  --include '$fasta*'");
+    system("/usr/bin/aws s3 cp $fastaLocation /tmp/ --recursive  --exclude '*'  --include '$spliceFile*'");
     my @results;
     while(@data){
       my $region = shift @data;
@@ -115,20 +110,24 @@ sub handle {
         }
       }
     }
-    #my $filename = "/tmp/test.tsv";
-    my $filename = "/tmp/".$tempFileName.".tsv";
-    open(my $fh, '>', $filename) or die "Could not open file '$filename' $!";
-    print $fh join("\n", @results);
-    close $fh;
+    if(scalar @results) {
+      #my $filename = "/tmp/test.tsv";
+      my $filename = "/tmp/".$tempFileName.".tsv";
+      open(my $fh, '>', $filename) or die "Could not open file '$filename' $!";
+      print $fh join("\n", @results);
+      close $fh;
 
-    my $out = 's3://'.$outputLocation.'/';
-    system("/opt/awscli/aws s3 cp $filename $out");
-    #print("Done Copying");
-    my $tempOut = 's3://'.$tempLocation.'/'.$tempFileName;
-    system("/opt/awscli/aws s3 rm $tempOut");
-    print("cleaning tmp");
-    system("rm -r /tmp/*"); #cleaning tmp after each use
-    print("Done Copying");
+      my $out = 's3://'.$outputLocation.'/';
+      system("/usr/bin/aws s3 cp $filename $out");
+      #print("Done Copying");
+      my $tempOut = 's3://'.$tempLocation.'/'.$tempFileName;
+      system("/usr/bin/aws s3 rm $tempOut");
+      print("cleaning tmp");
+      system("rm -r /tmp/*"); #cleaning tmp after each use
+      print("Done Copying");
+    } else {
+      print("Nothing to copy")
+    }
 }
 
 # parse a line of VCF input into a variation feature object
@@ -464,7 +463,7 @@ sub parse_vcf {
         my $mirnaLocalFile = "/tmp/".$mirnaFile;
         unless (-e $mirnaLocalFile) {
           print "File Doesn't Exist in local directory!";
-          system("/opt/awscli/aws s3 cp $fastaLocation /tmp/ --recursive  --exclude '*'  --include '$mirnaFile*'");
+          system("/usr/bin/aws s3 cp $fastaLocation /tmp/ --recursive  --exclude '*'  --include '$mirnaFile*'");
         }
         if($rows[1] eq "mirbase"){
           my $file = "sorted_filtered_mirna.gff3.gz";
@@ -567,7 +566,6 @@ sub parse_vcf {
         $cons = '5_prime_UTR_variant,'.$cons;
         }
       }
-
       my $line = $rank."\t".('.')."\t".$chr.':'.$start.'-'.$end."\t".$alt."\t".$cons."\t".$info{gene_name}."\t".$info{gene_id}."\t".$rows[2]."\t".
       $info{transcript_id}.".".$info{transcript_version}."\t".$info{transcript_biotype}."\t".($info{'exon_number'} || '-')."\t".
       ($tv->{'feature'}{'aa'} || '-')."\t".($tv->{'feature'}{'codons'} || '-')."\t".$strand."\t".($info{transcript_support_level}|| '-');
