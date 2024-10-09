@@ -566,7 +566,7 @@ sub parse_vcf {
         $cons = '5_prime_UTR_variant,'.$cons;
         }
       }
-      my $line = $rank."\t".('.')."\t".$chr.':'.$start.'-'.$end."\t".$alt."\t".$cons."\t".$info{gene_name}."\t".$info{gene_id}."\t".$rows[2]."\t".
+      my $line = $rank."\t".('.')."\t".$chr.':'.$start.'-'.$end."\t".$alt."\t".$cons."\t".(defined $info{gene_name} ? $info{gene_name} : '-')."\t".$info{gene_id}."\t".$rows[2]."\t".
       $info{transcript_id}.".".$info{transcript_version}."\t".$info{transcript_biotype}."\t".($info{'exon_number'} || '-')."\t".
       ($tv->{'feature'}{'aa'} || '-')."\t".($tv->{'feature'}{'codons'} || '-')."\t".$strand."\t".($info{transcript_support_level}|| '-');
       #print($result1);
