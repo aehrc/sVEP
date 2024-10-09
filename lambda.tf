@@ -8,6 +8,10 @@ resource "aws_lambda_permission" "APIinitQuery" {
   principal = "apigateway.amazonaws.com"
   source_arn = "${aws_api_gateway_rest_api.VPApi.execution_arn}/*/*/${aws_api_gateway_resource.submit.path_part}"
 }
+resource "aws_lambda_function_recursion_config" "APIinitQuery" {
+  function_name = module.lambda-initQuery.function_name
+  recursive_loop = "Allow"
+}
 
 #
 # getResultsURL Lambda Function
@@ -29,6 +33,10 @@ resource "aws_lambda_permission" "SNSLambdaqueryVCF" {
   function_name = module.lambda-queryVCF.function_name
   principal = "sns.amazonaws.com"
   source_arn = aws_sns_topic.queryVCF.arn
+}
+resource "aws_lambda_function_recursion_config" "SNSLambdaqueryVCF" {
+  function_name = module.lambda-queryVCF.function_name
+  recursive_loop = "Allow"
 }
 
 #
@@ -52,6 +60,10 @@ resource "aws_lambda_permission" "SNSLambdaqueryGTF" {
   principal = "sns.amazonaws.com"
   source_arn = aws_sns_topic.queryGTF.arn
 }
+resource "aws_lambda_function_recursion_config" "SNSLambdaqueryGTF" {
+  function_name = module.lambda-queryGTF.function_name
+  recursive_loop = "Allow"
+}
 
 
 #
@@ -63,6 +75,10 @@ resource "aws_lambda_permission" "SNSLambdapluginConsequence" {
   function_name = module.lambda-pluginConsequence.function_name
   principal = "sns.amazonaws.com"
   source_arn = aws_sns_topic.pluginConsequence.arn
+}
+resource "aws_lambda_function_recursion_config" "SNSLambdapluginConsequence" {
+  function_name = module.lambda-pluginConsequence.function_name
+  recursive_loop = "Allow"
 }
 
 
@@ -98,6 +114,10 @@ resource "aws_lambda_permission" "SNSLambdaconcatStarter" {
   principal = "sns.amazonaws.com"
   source_arn = aws_sns_topic.concatStarter.arn
 }
+resource "aws_lambda_function_recursion_config" "SNSLambdaconcatStarter" {
+  function_name = module.lambda-concatStarter.function_name
+  recursive_loop = "Allow"
+}
 
 #
 # createPages Lambda Function
@@ -109,6 +129,11 @@ resource "aws_lambda_permission" "SNSLambdacreatePages" {
   principal = "sns.amazonaws.com"
   source_arn = aws_sns_topic.createPages.arn
 }
+resource "aws_lambda_function_recursion_config" "SNSLambdacreatePages" {
+  function_name = module.lambda-createPages.function_name
+  recursive_loop = "Allow"
+}
+
 #
 # concatPages Lambda Function
 #
